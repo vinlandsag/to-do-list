@@ -1,12 +1,25 @@
 {
   "compilerOptions": {
+    // Base Options
+    "target": "ESNext",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "isolatedModules": true,
+
+    // Module Resolution
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
     "allowJs": true,
-    "jsx": "react-jsx",
-    "noEmit": true
+    "resolveJsonModule": true,
+
+    // Strictness
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src"]
 }
