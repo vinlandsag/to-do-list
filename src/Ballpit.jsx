@@ -32,7 +32,7 @@ class x {
   cameraMinAspect;
   cameraMaxAspect;
   cameraFov;
-  maxPixelRatio;
+  maxPixelRatio = 1.5;
   minPixelRatio;
   scene;
   renderer;
@@ -203,8 +203,14 @@ class x {
 
   #w() {
     if (this.#n) return;
-    const animate = () => {
+    let lastTime = 0;
+    const animate = (time) => {
       this.#l = requestAnimationFrame(animate);
+      if (document.hidden) return;
+      const deltaTime = time - lastTime;
+      if (deltaTime < 33) return;
+      lastTime = time - (deltaTime % 33);
+
       this.#c.update();
       this.#h.delta = this.#c.getDelta();
       this.#h.elapsed += this.#h.delta;
@@ -610,7 +616,7 @@ class Z extends d {
     const i = { ...X, ...t };
     const s = new RoomEnvironment();
     const n = new p(e, 0.04).fromScene(s).texture;
-    const o = new g();
+    const o = new g(1, 16, 12);
     const r = new Y({ envMap: n, ...i.materialParams });
     r.envMapRotation.x = -Math.PI / 2;
     super(o, r, i.count);
@@ -691,11 +697,12 @@ function createBallpit(e, t = {}) {
   const i = new x({
     canvas: e,
     size: 'parent',
-    rendererOptions: { antialias: true, alpha: true }
+    rendererOptions: { antialias: false, alpha: true }
   });
 
   let s;
   i.renderer.toneMapping = v;
+  i.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   i.camera.position.set(0, 0, 20);
   i.camera.lookAt(0, 0, 0);
   i.cameraMaxAspect = 1.5;

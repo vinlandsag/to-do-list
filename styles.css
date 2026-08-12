@@ -159,9 +159,90 @@ input:checked + .slider:before {
   position: relative;
   min-height: 100dvh;
   display: grid;
-  place-items: center;
-  padding: 2rem;
+  grid-template-columns: minmax(auto, 500px) minmax(auto, 440px);
+  gap: 8vw;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 4rem;
   overflow: hidden;
+}
+
+.login-marketing {
+  z-index: 1;
+  animation: fade-in 0.6s ease-out;
+}
+.login-marketing-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--purple);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 1rem;
+}
+.login-marketing-kicker span {
+  width: 24px;
+  height: 2px;
+  background: var(--purple);
+}
+.login-marketing h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(40px, 5vw, 64px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  margin: 0 0 1.5rem;
+}
+.login-marketing h2 em {
+  font-style: italic;
+  color: var(--purple);
+  background: linear-gradient(135deg, var(--purple), #f5b267);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.login-marketing-copy {
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin-bottom: 2.5rem;
+  max-width: 90%;
+}
+.login-benefits {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 1.5rem;
+}
+.login-benefits li {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.login-benefits li > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--purple) 15%, transparent);
+  color: var(--purple);
+  font-size: 14px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.login-benefits strong {
+  display: block;
+  font-size: 16px;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.login-benefits small {
+  display: block;
+  font-size: 14px;
+  color: var(--muted);
 }
 
 /* Floating decorative orbs */
@@ -1786,3 +1867,70 @@ input:checked + .slider:before {
 .floating-timer-widget .timer-info { display: flex; flex-direction: column; line-height: 1.2; }
 .floating-timer-widget .timer-info strong { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }
 .floating-timer-widget .timer-info span { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--purple); font-weight: 700; }
+
+/* ─── Static Orbs Background ─── */
+.css-orbs-background { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background-color: var(--surface); }
+.css-orbs-background .orb-1, .css-orbs-background .orb-2, .css-orbs-background .orb-3 { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.5; }
+.css-orbs-background .orb-1 { width: 50vw; height: 50vw; background: color-mix(in srgb, var(--purple) 60%, transparent); top: -10vw; left: -10vw; }
+.css-orbs-background .orb-2 { width: 40vw; height: 40vw; background: color-mix(in srgb, var(--lilac) 70%, transparent); bottom: -5vw; right: -5vw; }
+.css-orbs-background .orb-3 { width: 30vw; height: 30vw; background: color-mix(in srgb, var(--shadow) 50%, transparent); top: 40%; left: 30%; opacity: 0.3; }
+
+/* ─── Mobile Quick Add & Form Toggling ─── */
+.mobile-quick-add, .mobile-form-cancel { display: none; }
+
+@keyframes mobileFormReveal {
+  0% { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 760px) {
+  .mobile-quick-add { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 2px 2px; }
+  .mobile-quick-add p { color: var(--ink); letter-spacing: -.02em; margin: 0 0 3px; font-size: 16px; font-weight: 750; }
+  .mobile-quick-add span { max-width: 260px; color: var(--muted); font-size: 12px; line-height: 1.4; display: block; }
+  .mobile-quick-add .primary-button { white-space: nowrap; flex: none; }
+  .home-task-form.is-collapsed { display: none; }
+  .home-task-form.is-open { animation: .22s cubic-bezier(.2,.8,.2,1) mobileFormReveal; }
+  .mobile-form-cancel { display: inline-flex; align-items: center; }
+}
+
+@media (max-width: 420px) {
+  .mobile-quick-add { align-items: flex-start; padding-top: 15px; }
+  .mobile-quick-add span { max-width: 190px; }
+  .mobile-quick-add .primary-button { padding-left: 11px; padding-right: 11px; }
+}
+
+/* ─── Missing Login Page Mobile Styles ─── */
+
+@media (max-width: 760px) {
+  .login-page {
+    display: flex;
+    flex-direction: column;
+    padding: 2rem 1.5rem 4rem;
+    gap: 4rem;
+    overflow-y: auto;
+  }
+  .login-card {
+    order: 1;
+    width: 100%;
+  }
+  .login-marketing {
+    order: 2;
+    display: block;
+  }
+  .login-marketing h2 {
+    font-size: 32px;
+  }
+  .login-marketing-copy {
+    font-size: 15px;
+    margin-bottom: 2rem;
+  }
+  /* Hide hero text on mobile in main app to save space */
+  .hero .eyebrow, .hero h1, .hero-copy { display: none; }
+  .hero > div:first-child { width: 100%; }
+}
+
+@media (max-width: 420px) {
+  .login-mobile-promise { margin-top: 14px; }
+  .login-mobile-promise h2 { font-size: 23px; }
+  .login-mobile-promise > p:last-child { font-size: 11px; }
+}

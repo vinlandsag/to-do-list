@@ -12,7 +12,9 @@ export default function SettingsView({
   tags,
   setTags,
   savedViews,
-  setSavedViews
+  setSavedViews,
+  animatedBackground,
+  onToggleAnimatedBackground
 }) {
   const [activeTab, setActiveTab] = useState('priorities');
   const [editingPriorityId, setEditingPriorityId] = useState(null);
@@ -133,6 +135,7 @@ export default function SettingsView({
           <button className={`tab-btn ${activeTab === 'tags' ? 'active' : ''}`} onClick={() => setActiveTab('tags')}>Tags</button>
           <button className={`tab-btn ${activeTab === 'rules' ? 'active' : ''}`} onClick={() => setActiveTab('rules')}>Auto Rules</button>
           <button className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>Insights</button>
+          <button className={`tab-btn ${activeTab === 'appearance' ? 'active' : ''}`} onClick={() => setActiveTab('appearance')}>Appearance</button>
         </div>
       </header>
 
@@ -330,6 +333,28 @@ export default function SettingsView({
             {agingTasks.length === 0 && (
               <p className="success-text mt-2">Great job! No stale critical tasks.</p>
             )}
+          </div>
+        </div>
+      )}
+      {activeTab === 'appearance' && (
+        <div className="settings-section">
+          <h3>Appearance</h3>
+          <p className="settings-desc">Customize the look and feel of your workspace.</p>
+
+          <div className="insight-card">
+            <h4 style={{ marginBottom: '8px' }}>Animated Background</h4>
+            <p className="settings-desc" style={{ marginBottom: '16px' }}>
+              Disable this for better battery life and performance. A lightweight gradient will be used instead.
+            </p>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={animatedBackground} 
+                onChange={(e) => onToggleAnimatedBackground(e.target.checked)} 
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '14px', fontWeight: 600 }}>Enable Animated Background</span>
+            </label>
           </div>
         </div>
       )}

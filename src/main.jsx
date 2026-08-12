@@ -70,8 +70,28 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
+function getAnimatedBgDefault() {
+  if (typeof window === 'undefined') return true;
+  const isMobile = window.innerWidth < 768;
+  const isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const hasLowConcurrency = navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4;
+  const hasLowMemory = navigator.deviceMemory && navigator.deviceMemory < 4;
+  if (isMobile || isReducedMotion || hasLowConcurrency || hasLowMemory) return false;
+  return true;
+}
+
 function App() {
   const [session, setSession] = useState(getSession);
+  const [animatedBackground, setAnimatedBackground] = useState(() => {
+    const stored = localStorage.getItem('flowlist-animated-bg');
+    if (stored !== null) return stored === 'true';
+    return getAnimatedBgDefault();
+  });
+
+  const toggleAnimatedBackground = (val) => {
+    setAnimatedBackground(val);
+    localStorage.setItem('flowlist-animated-bg', String(val));
+  };
   const [tasks, setTasks] = useState(() => JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
   const [projects, setProjects] = useState(() => JSON.parse(localStorage.getItem(PROJECTS_KEY) || '[]'));
   const [priorities, setPriorities] = useState(() => {
@@ -86,6 +106,9 @@ function App() {
     try { return JSON.parse(localStorage.getItem(SAVED_VIEWS_KEY)) || []; } catch { return []; }
   });
   const [listType, setListType] = useState('tasks');
+  const [homeFormOpen, setHomeFormOpen] = useState(() =>
+    typeof window === 'undefined' || window.innerWidth > 760
+  );
   const [filter, setFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -123,7 +146,7 @@ function App() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(nextTasks));
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   useEffect(() => {
@@ -221,11 +244,18 @@ function App() {
   const { toasts, notifications, unreadCount, overdueTasks, markRead, markAllRead, clearNotifications, dismissToast, snoozeTask, completeTaskFromToast } = useNotifications(tasks, persist, activities, session);
 
   const [tagAutocomplete, setTagAutocomplete] = useState({ active: false, query: '' });
+  const taskTitleInputRef = useRef(null);
+
+  useEffect(() => {
+    if (homeFormOpen && window.matchMedia('(max-width: 760px)').matches) {
+      taskTitleInputRef.current?.focus();
+    }
+  }, [homeFormOpen, listType]);
 
   const handleTitleChange = (e) => {
     const val = e.target.value;
     setTitle(val);
-    
+
     const match = val.match(/(?:^|\s)#([\w-]*)$/);
     if (match) {
       setTagAutocomplete({ active: true, query: match[1].toLowerCase() });
@@ -305,23 +335,24 @@ function App() {
     persist(nextTasks);
     resetForm();
     setTagAutocomplete({ active: false, query: '' });
+    setHomeFormOpen(false);
   };
 
   const toggleTask = id => {
     let nextTasks = [...tasks];
     const taskIndex = nextTasks.findIndex(t => t.id === id);
     if (taskIndex === -1) return;
-    
+
     const task = nextTasks[taskIndex];
     const isCompleting = !task.completed;
-    
-    nextTasks[taskIndex] = { 
-      ...task, 
-      completed: isCompleting, 
+
+    nextTasks[taskIndex] = {
+      ...task,
+      completed: isCompleting,
       completedAt: isCompleting ? new Date().toISOString() : null,
       completedBy: isCompleting ? (session?.email || null) : null
     };
-    
+
     if (isCompleting && task.recurrence && task.recurrence.status !== 'paused' && task.recurrence.status !== 'ended') {
       const nextDate = getNextOccurrenceDate(task.recurrence, task.remindAt || task.createdAt || new Date());
       if (nextDate) {
@@ -349,14 +380,15 @@ function App() {
     persist(nextTasks);
   };
   const deleteTask = id => { persist(tasks.filter(task => task.id !== id)); if (editingId === id) resetForm(); };
-  const startEditing = task => { 
-    setEditingId(task.id); 
+  const startEditing = task => {
+    setHomeFormOpen(true);
+    setEditingId(task.id);
     const tagString = (task.tags && task.tags.length > 0) ? ` ${task.tags.map(t => `#${t}`).join(' ')}` : '';
-    setTitle(task.title + tagString); 
-    setDescription(task.description); 
-    setRemindAt(task.remindAt || ''); 
-    setProjectId(task.projectId || ''); 
-    setPriority(task.priority || ''); 
+    setTitle(task.title + tagString);
+    setDescription(task.description);
+    setRemindAt(task.remindAt || '');
+    setProjectId(task.projectId || '');
+    setPriority(task.priority || '');
     if (task.recurrence) {
       setRecurrenceFrequency(task.recurrence.frequency || 'none');
       setRecurrenceInterval(task.recurrence.interval || 1);
@@ -368,10 +400,10 @@ function App() {
       setRecurrenceWeekdays([]);
       setRecurrenceEndDate('');
     }
-    if (task.projectId || task.priority || (task.recurrence && task.recurrence.frequency !== 'none')) setShowAdvanced(true); 
-    window.scrollTo({ top: 0, behavior: 'smooth' }); 
+    if (task.projectId || task.priority || (task.recurrence && task.recurrence.frequency !== 'none')) setShowAdvanced(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  const switchList = type => { setListType(type); setFilter('all'); resetForm(); };
+  const switchList = type => { setListType(type); setFilter('all'); resetForm(); setHomeFormOpen(false); };
 
   const handleLogin = (sessionData) => {
     setSession(sessionData);
@@ -394,7 +426,7 @@ function App() {
   const handleTaskDrop = (e, dropTargetId) => {
     e.preventDefault();
     if (draggedTaskId === null || draggedTaskId === dropTargetId) return;
-    
+
     const dragIndex = tasks.findIndex(t => t.id === draggedTaskId);
     const dropIndex = tasks.findIndex(t => t.id === dropTargetId);
 
@@ -403,7 +435,7 @@ function App() {
     const nextTasks = [...tasks];
     const draggedItem = nextTasks.splice(dragIndex, 1)[0];
     nextTasks.splice(dropIndex, 0, draggedItem);
-    
+
     persist(nextTasks);
     setDraggedTaskId(null);
   };
@@ -415,19 +447,27 @@ function App() {
 
   /* ─── Main app (authenticated) ─── */
   return <>
-    <div className="ballpit-container" aria-hidden="true">
-      <Ballpit
-        count={200}
-        colors={[0x6254e7, 0x9e90ff, 0x8ac6ff, 0xf5b267, 0xffb7a4]}
-        radiusCm={1}
-        gravity={0}
-        friction={0.94}
-        wallBounce={0.95}
-        maxVelocity={0.65}
-        cursorForce={8}
-        followCursor={true}
-      />
-    </div>
+    {animatedBackground ? (
+      <div className="ballpit-container" aria-hidden="true">
+        <Ballpit
+          count={typeof window !== 'undefined' && window.innerWidth < 768 ? 15 : 60}
+          colors={[0x6254e7, 0x9e90ff, 0x8ac6ff, 0xf5b267, 0xffb7a4]}
+          radiusCm={1}
+          gravity={0}
+          friction={0.94}
+          wallBounce={0.95}
+          maxVelocity={0.65}
+          cursorForce={8}
+          followCursor={typeof window !== 'undefined' && window.innerWidth >= 768}
+        />
+      </div>
+    ) : (
+      <div className="css-orbs-background" aria-hidden="true">
+        <div className="orb-1"></div>
+        <div className="orb-2"></div>
+        <div className="orb-3"></div>
+      </div>
+    )}
     <aside id="main-navigation" className={`side-nav${sidebarOpen ? ' is-open' : ''}`} aria-label="Main navigation">
       <div className="side-nav-top">
         <button className="side-nav-brand" type="button" onClick={() => setSidebarOpen(false)} aria-label="Flowlist home">
@@ -531,13 +571,13 @@ function App() {
           onSetTimer={setTimer}
           onToggleTimer={toggleTimer}
           onSaveFocusTask={(taskData) => {
-            const newTask = { 
-              id: crypto.randomUUID(), 
+            const newTask = {
+              id: crypto.randomUUID(),
               type: 'tasks',
               ...taskData,
-              createdAt: new Date().toISOString(), 
-              completed: false, 
-              completedAt: null 
+              createdAt: new Date().toISOString(),
+              completed: false,
+              completedAt: null
             };
             persist([newTask, ...tasks]);
           }}
@@ -559,6 +599,8 @@ function App() {
           setTags={setTags}
           savedViews={savedViews}
           setSavedViews={setSavedViews}
+          animatedBackground={animatedBackground}
+          onToggleAnimatedBackground={toggleAnimatedBackground}
           onBulkUpdateTasks={persist}
           onSavePriority={p => {
             const exists = priorities.find(x => x.id === p.id);
@@ -626,7 +668,7 @@ function App() {
         />
       ) : currentView === 'calendar' ? (
         <section className="workspace-calendar">
-          <CalendarView 
+          <CalendarView
             tasks={tasks}
             onToggleTask={toggleTask}
             onEditTask={(task) => {
@@ -642,13 +684,22 @@ function App() {
             <button className={listType === 'tasks' ? 'active' : ''} onClick={() => switchList('tasks')} type="button" role="tab" aria-selected={listType === 'tasks'}><span>✓</span><b>To-do list</b><small>Plan your tasks</small></button>
             <button className={listType === 'reminders' ? 'active' : ''} onClick={() => switchList('reminders')} type="button" role="tab" aria-selected={listType === 'reminders'}><span>◷</span><b>Reminder list</b><small>Never miss a thing</small></button>
           </div>
-          <form className="add-card" onSubmit={saveTask}>
+          <div className="mobile-quick-add">
+            <div>
+              <p>{listType === 'tasks' ? 'Your to-dos' : 'Your reminders'}</p>
+              <span>{listType === 'tasks' ? 'Keep your day clear and moving.' : 'Set it once, then let Flowlist remember.'}</span>
+            </div>
+            <button className="primary-button" type="button" onClick={() => setHomeFormOpen(true)}>
+              {listType === 'tasks' ? 'Add task' : 'Add reminder'} <span>+</span>
+            </button>
+          </div>
+          <form className={`add-card home-task-form${homeFormOpen ? ' is-open' : ' is-collapsed'}`} onSubmit={saveTask}>
             <div className="add-card-heading"><div className="icon-circle">{listType === 'tasks' ? '+' : '◷'}</div><div><h2>{editingId ? `Edit ${listType === 'tasks' ? 'task' : 'reminder'}` : `Add a ${listType === 'tasks' ? 'task' : 'reminder'}`}</h2><p>{listType === 'tasks' ? 'What needs your attention?' : 'What would you like to remember?'}</p></div></div>
             <div style={{ position: 'relative' }}>
               <label><span>{listType === 'tasks' ? 'Task title' : 'Reminder title'}</span>
-                <input value={title} onChange={handleTitleChange} maxLength="80" required placeholder={listType === 'tasks' ? 'e.g. Send the project update #urgent' : 'e.g. Call Mum'} autoComplete="off" />
+                <input ref={taskTitleInputRef} value={title} onChange={handleTitleChange} maxLength="80" required placeholder={listType === 'tasks' ? 'e.g. Send the project update #urgent' : 'e.g. Call Mum'} autoComplete="off" />
               </label>
-              
+
               {tagAutocomplete.active && (
                 <div className="tag-autocomplete-popover" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: '12px', zIndex: 10, padding: '8px', boxShadow: '0 10px 30px var(--shadow)', marginTop: '4px' }}>
                   <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'var(--muted)', fontWeight: 600 }}>Select a tag</p>
@@ -659,12 +710,12 @@ function App() {
                       let fallback = false;
                       if (matches.length === 0 && query.length > 2) {
                         matches = tags.map(t => ({ tag: t, dist: levenshtein(query, t.name) }))
-                                      .filter(t => t.dist <= 2)
-                                      .sort((a, b) => a.dist - b.dist)
-                                      .map(t => t.tag);
+                          .filter(t => t.dist <= 2)
+                          .sort((a, b) => a.dist - b.dist)
+                          .map(t => t.tag);
                         if (matches.length > 0) fallback = true;
                       }
-                      
+
                       return (
                         <>
                           {fallback && <p style={{ fontSize: '11px', color: 'var(--muted)', margin: '0 0 4px', fontStyle: 'italic' }}>Did you mean?</p>}
@@ -755,7 +806,7 @@ function App() {
             <button className="text-button advanced-toggle" type="button" onClick={() => setShowAdvanced(!showAdvanced)}>
               {showAdvanced ? 'Hide options' : 'More options...'}
             </button>
-            
+
             {showAdvanced && (
               <div className="advanced-options-grid">
                 <label><span>Project</span>
@@ -769,7 +820,7 @@ function App() {
                 <label><span>Priority</span>
                   <select value={priority} onChange={e => setPriority(e.target.value)}>
                     <option value="">None</option>
-                    {[...priorities].sort((a,b) => a.rank - b.rank).map(p => (
+                    {[...priorities].sort((a, b) => a.rank - b.rank).map(p => (
                       <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
                     ))}
                   </select>
@@ -778,19 +829,20 @@ function App() {
             )}
 
             <div className="form-actions">
-              {editingId && <button className="text-button" type="button" onClick={resetForm}>Cancel edit</button>}
+              <button className="text-button mobile-form-cancel" type="button" onClick={() => { resetForm(); setHomeFormOpen(false); }}>Cancel</button>
+              {editingId && <button className="text-button" type="button" onClick={() => { resetForm(); setHomeFormOpen(false); }}>Cancel edit</button>}
               <button className="primary-button" type="submit">{editingId ? 'Save changes' : `Add ${listType === 'tasks' ? 'task' : 'reminder'}`} <span>→</span></button>
             </div>
           </form>
-  
+
           <section className="task-area" aria-labelledby="tasks-title">
             <div className="task-toolbar"><div><p className="section-kicker">{listType === 'tasks' ? 'TASKS' : 'REMINDERS'}</p><h2 id="tasks-title">{listType === 'tasks' ? 'Your to-dos' : 'Your reminders'} <span>{currentTasks.length}</span></h2></div><div className="filters" role="group" aria-label="Filter tasks">
               <button className={`filter ${bulkSelectMode ? 'active' : ''}`} onClick={() => { setBulkSelectMode(!bulkSelectMode); setSelectedTaskIds(new Set()); }} type="button" style={{ marginRight: '8px' }}>✓ Select</button>
               {[['all', 'All'], ['active', 'Active'], ['completed', 'Done']].map(([value, label]) => <button key={value} className={`filter ${filter === value ? 'active' : ''}`} onClick={() => setFilter(value)} type="button">{label}</button>)}
             </div></div>
             <div className="task-list" aria-live="polite">
-              {visibleTasks.map(task => <article 
-                className={`task-card ${task.completed ? 'completed' : ''} ${draggedTaskId === task.id ? 'dragging' : ''}`} 
+              {visibleTasks.map(task => <article
+                className={`task-card ${task.completed ? 'completed' : ''} ${draggedTaskId === task.id ? 'dragging' : ''}`}
                 key={task.id}
                 draggable={true}
                 onDragStart={(e) => handleTaskDragStart(e, task.id)}
@@ -812,40 +864,40 @@ function App() {
                 )}
                 <div className="task-content">
                   <h3 className="task-title">{task.title}</h3>
-                
-                {/* Advanced task badges */}
-                {(task.priority || task.projectId || (task.tags && task.tags.length > 0)) && (
-                  <div className="task-badges">
-                    {task.projectId && projects.find(p => p.id === task.projectId) && (() => {
-                      const proj = projects.find(p => p.id === task.projectId);
-                      return <span className="badge project-badge" style={{ '--badge-color': proj.color || '#9e90ff' }}>{proj.icon} {proj.name}</span>;
-                    })()}
-                    {task.priority && priorities.find(p => p.id === task.priority) && (() => {
-                      const prio = priorities.find(p => p.id === task.priority);
-                      return (
-                        <span className="badge priority-badge" style={{ borderColor: prio.color, color: prio.color, backgroundColor: 'color-mix(in srgb, var(--paper) 70%, transparent)' }}>
-                          {prio.icon} {prio.name}
-                        </span>
-                      );
-                    })()}
-                    {task.tags && task.tags.map(tagName => {
-                      const tagObj = tags.find(t => t.name === tagName);
-                      return (
-                        <span key={tagName} className="badge tag-badge" style={tagObj ? { '--badge-color': tagObj.color } : {}}>
-                          {tagObj?.icon ? `${tagObj.icon} ` : ''}#{tagName}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
 
-                {task.recurrence && task.recurrence.frequency !== 'none' && (
-                  <p className="recurrence-label" style={{ fontSize: '11px', color: 'var(--purple)', marginTop: '4px', fontWeight: 600 }}>
-                    ↻ {getRecurrenceLabel(task.recurrence)}
-                  </p>
-                )}
+                  {/* Advanced task badges */}
+                  {(task.priority || task.projectId || (task.tags && task.tags.length > 0)) && (
+                    <div className="task-badges">
+                      {task.projectId && projects.find(p => p.id === task.projectId) && (() => {
+                        const proj = projects.find(p => p.id === task.projectId);
+                        return <span className="badge project-badge" style={{ '--badge-color': proj.color || '#9e90ff' }}>{proj.icon} {proj.name}</span>;
+                      })()}
+                      {task.priority && priorities.find(p => p.id === task.priority) && (() => {
+                        const prio = priorities.find(p => p.id === task.priority);
+                        return (
+                          <span className="badge priority-badge" style={{ borderColor: prio.color, color: prio.color, backgroundColor: 'color-mix(in srgb, var(--paper) 70%, transparent)' }}>
+                            {prio.icon} {prio.name}
+                          </span>
+                        );
+                      })()}
+                      {task.tags && task.tags.map(tagName => {
+                        const tagObj = tags.find(t => t.name === tagName);
+                        return (
+                          <span key={tagName} className="badge tag-badge" style={tagObj ? { '--badge-color': tagObj.color } : {}}>
+                            {tagObj?.icon ? `${tagObj.icon} ` : ''}#{tagName}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
 
-                {task.remindAt && <p className="reminder-time">◷ {formatDate(task.remindAt)}</p>}
+                  {task.recurrence && task.recurrence.frequency !== 'none' && (
+                    <p className="recurrence-label" style={{ fontSize: '11px', color: 'var(--purple)', marginTop: '4px', fontWeight: 600 }}>
+                      ↻ {getRecurrenceLabel(task.recurrence)}
+                    </p>
+                  )}
+
+                  {task.remindAt && <p className="reminder-time">◷ {formatDate(task.remindAt)}</p>}
                   {/* Overdue indicator */}
                   {overdueTasks.has(task.id) && (
                     <p className="overdue-indicator">

@@ -98,7 +98,7 @@ export default function LoginPage({ onLogin }) {
       {/* Ballpit background for visual consistency */}
       <div className="ballpit-container" aria-hidden="true">
         <Ballpit
-          count={150}
+          count={typeof window !== 'undefined' && window.innerWidth < 768 ? 15 : 60}
           colors={[0x6254e7, 0x9e90ff, 0x8ac6ff, 0xf5b267, 0xffb7a4]}
           radiusCm={1}
           gravity={0}
@@ -106,7 +106,7 @@ export default function LoginPage({ onLogin }) {
           wallBounce={0.95}
           maxVelocity={0.5}
           cursorForce={6}
-          followCursor={true}
+          followCursor={typeof window !== 'undefined' && window.innerWidth >= 768}
         />
       </div>
 
@@ -119,6 +119,17 @@ export default function LoginPage({ onLogin }) {
 
       <ThemeToggle />
 
+      <aside className="login-marketing" aria-label="Why use Flowlist">
+        <p className="login-marketing-kicker"><span /> A calmer way to plan</p>
+        <h2>Make room for<br /><em>what matters.</em></h2>
+        <p className="login-marketing-copy">Flowlist helps you capture what needs doing, remember it at the right time, and move through your day with a little more ease.</p>
+        <ul className="login-benefits">
+          <li><span>✓</span><div><strong>Keep today clear</strong><small>Simple lists, without the clutter.</small></div></li>
+          <li><span>◷</span><div><strong>Remember with less effort</strong><small>Gentle reminders when they matter.</small></div></li>
+          <li><span>↻</span><div><strong>Let routines take care of themselves</strong><small>Repeat the things you do often.</small></div></li>
+        </ul>
+      </aside>
+
       {/* Login card */}
       <div className={`login-card${shake ? ' login-card-shake' : ''}`}>
         {/* Logo / Brand */}
@@ -130,6 +141,11 @@ export default function LoginPage({ onLogin }) {
           <p className="login-subtitle">
             {isSignUp ? 'Create your account' : 'Welcome back'}
           </p>
+          <div className="login-mobile-promise">
+            <p className="login-promise-kicker">Your day, organized</p>
+            <h2>Make space for<br /><em>what matters.</em></h2>
+            <p>Choose a simple to-do list or plan the things you need to remember.</p>
+          </div>
         </div>
 
         {/* Error / Success messages */}
