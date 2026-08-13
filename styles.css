@@ -200,6 +200,7 @@ input:checked + .slider:before {
   color: var(--purple);
   background: linear-gradient(135deg, var(--purple), #f5b267);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 .login-marketing-copy {
@@ -1891,6 +1892,11 @@ input:checked + .slider:before {
   .home-task-form.is-collapsed { display: none; }
   .home-task-form.is-open { animation: .22s cubic-bezier(.2,.8,.2,1) mobileFormReveal; }
   .mobile-form-cancel { display: inline-flex; align-items: center; }
+  
+  /* Settings Mobile Fix */
+  .settings-header { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .settings-tabs { width: 100%; overflow-x: auto; padding-bottom: 8px; flex-wrap: nowrap; }
+  .settings-tabs::-webkit-scrollbar { display: none; }
 }
 
 @media (max-width: 420px) {

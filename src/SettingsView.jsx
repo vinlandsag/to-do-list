@@ -1,6 +1,8 @@
 import { useState } from 'react';
 
 export default function SettingsView({ 
+  activeTab,
+  setActiveTab,
   priorities, 
   onSavePriority, 
   onDeletePriority,
@@ -16,7 +18,6 @@ export default function SettingsView({
   animatedBackground,
   onToggleAnimatedBackground
 }) {
-  const [activeTab, setActiveTab] = useState('priorities');
   const [editingPriorityId, setEditingPriorityId] = useState(null);
   const [editingTagId, setEditingTagId] = useState(null);
   const [priorityForm, setPriorityForm] = useState({ name: '', icon: '🚨', color: '#ffcdd2' });

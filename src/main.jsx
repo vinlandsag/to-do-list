@@ -125,6 +125,7 @@ function App() {
   const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentView, setCurrentView] = useState('home');
+  const [settingsTab, setSettingsTab] = useState('priorities');
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
   const [bulkTagModalOpen, setBulkTagModalOpen] = useState(false);
@@ -506,7 +507,7 @@ function App() {
           );
         })}
         {savedViews.length === 0 && (
-          <button className="side-nav-link" type="button" onClick={() => { setCurrentView('settings'); setSidebarOpen(false); }}>
+          <button className="side-nav-link" type="button" onClick={() => { setSettingsTab('tags'); setCurrentView('settings'); setSidebarOpen(false); }}>
             <span className="side-nav-icon">#</span><span>Tags</span><small>Add in Settings</small>
           </button>
         )}
@@ -592,6 +593,8 @@ function App() {
         />
       ) : currentView === 'settings' ? (
         <SettingsView
+          activeTab={settingsTab}
+          setActiveTab={setSettingsTab}
           priorities={priorities}
           rules={rules}
           tasks={tasks}
