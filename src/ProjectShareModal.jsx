@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ROLES, INVITE_STATUS, getAvatarColor, getAvatarInitials } from './utils/collaboration';
+import { repository } from './data/repository.js';
 
 export default function ProjectShareModal({ project, session, onClose, onUpdateProject, onUpdateActivities, activities }) {
   const [inviteEmail, setInviteEmail] = useState('');
@@ -7,7 +8,7 @@ export default function ProjectShareModal({ project, session, onClose, onUpdateP
 
   const isOwner = project.ownerId === session?.email;
 
-  const handleInvite = (e) => {
+  const handleInvite = async (e) => {
     e.preventDefault();
     if (!inviteEmail.trim() || !isOwner) return;
 
@@ -16,35 +17,41 @@ export default function ProjectShareModal({ project, session, onClose, onUpdateP
     if (email === project.ownerId) return; // Cannot invite owner
     if (project.members.some(m => m.email === email)) return; // Already invited
 
-    const newMember = {
-      userId: crypto.randomUUID(),
-      name: email.split('@')[0], // Simulated name
-      email: email,
-      avatarColor: getAvatarColor(email),
-      role: inviteRole,
-      inviteStatus: INVITE_STATUS.PENDING
-    };
+    try {
+      await repository.shareProject(project.id, email);
+      
+      const newMember = {
+        userId: crypto.randomUUID(),
+        name: email.split('@')[0], // Simulated name
+        email: email,
+        avatarColor: getAvatarColor(email),
+        role: inviteRole,
+        inviteStatus: INVITE_STATUS.PENDING
+      };
 
-    const nextProject = {
-      ...project,
-      isShared: true,
-      members: [...project.members, newMember]
-    };
+      const nextProject = {
+        ...project,
+        isShared: true,
+        members: [...project.members, newMember]
+      };
 
-    onUpdateProject(nextProject);
+      onUpdateProject(nextProject);
 
-    // Log Activity
-    const newActivity = {
-      id: crypto.randomUUID(),
-      projectId: project.id,
-      actorId: session?.email,
-      type: 'member_invited',
-      metadata: { targetEmail: email, role: inviteRole },
-      createdAt: new Date().toISOString()
-    };
-    onUpdateActivities([newActivity, ...activities]);
+      // Log Activity
+      const newActivity = {
+        id: crypto.randomUUID(),
+        projectId: project.id,
+        actorId: session?.email,
+        type: 'member_invited',
+        metadata: { targetEmail: email, role: inviteRole },
+        createdAt: new Date().toISOString()
+      };
+      onUpdateActivities([newActivity, ...activities]);
 
-    setInviteEmail('');
+      setInviteEmail('');
+    } catch (err) {
+      alert('Could not share project: ' + err.message);
+    }
   };
 
   const handleRemoveMember = (email) => {

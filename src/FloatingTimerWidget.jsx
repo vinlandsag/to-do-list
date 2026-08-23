@@ -36,10 +36,16 @@ export default function FloatingTimerWidget({ timeLeft, isRunning, onToggle, onC
       hasDragged.current = true;
     }
 
-    setPosition({
-      x: widgetStartPos.current.x + dx,
-      y: widgetStartPos.current.y + dy
-    });
+    let newX = widgetStartPos.current.x + dx;
+    let newY = widgetStartPos.current.y + dy;
+    
+    // Clamp to viewport bounds (assuming approx widget size of 150x60)
+    if (typeof window !== 'undefined') {
+      newX = Math.max(0, Math.min(newX, window.innerWidth - 150));
+      newY = Math.max(0, Math.min(newY, window.innerHeight - 60));
+    }
+
+    setPosition({ x: newX, y: newY });
   };
 
   const handlePointerUp = (e) => {

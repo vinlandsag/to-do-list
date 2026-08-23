@@ -425,7 +425,7 @@ export default function ProjectsView({
                           </p>
                         )}
                         {task.recurrence && task.recurrence.frequency !== 'none' && (
-                          <p className="recurrence-label" style={{ fontSize: '11px', color: 'var(--purple)', marginTop: '4px', fontWeight: 600 }}>
+                          <p className="recurrence-label">
                             ↻ {getRecurrenceLabel(task.recurrence)}
                           </p>
                         )}

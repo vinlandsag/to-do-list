@@ -1940,3 +1940,46 @@ input:checked + .slider:before {
   .login-mobile-promise h2 { font-size: 23px; }
   .login-mobile-promise > p:last-child { font-size: 11px; }
 }
+
+@media (max-width: 768px) {
+  /* Ensure proper touch targets on mobile */
+  button, .icon-button, .menu-toggle, select, input[type="button"], input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .checkbox {
+    /* Increase physical touch target without changing visual size drastically */
+    position: relative;
+    min-height: 44px;
+    min-width: 44px;
+    margin: -11px 0 0 -11px;
+    background-clip: content-box;
+    border-width: 12.5px; /* Transparent border hack for touch target */
+    border-color: transparent !important;
+  }
+  .checkbox::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 22px; height: 22px;
+    border: 1.5px solid var(--muted);
+    border-radius: 7px;
+    background: var(--paper);
+    transition: .2s;
+  }
+  .task-card.completed .checkbox::before {
+    border-color: var(--purple);
+    background: var(--purple);
+  }
+  .checkbox span {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Add keyboard clearance for main scrolling areas */
+  .app-shell, .workspace, .workspace-calendar, .settings-view {
+    padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}

@@ -1,122 +1,84 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { repository } from './data/repository.js';
 
-const NOTIFIED_KEY = 'flowlist-notified-v1';
-const NOTIFICATION_LOG_KEY = 'flowlist-notification-log-v1';
-
-/* ─── Tiny chime via Web Audio API (no external files) ─── */
-function playChime() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime);       // A5
-    osc.frequency.setValueAtTime(1108.73, ctx.currentTime + 0.1); // C#6
-    osc.frequency.setValueAtTime(1318.51, ctx.currentTime + 0.2); // E6
-
-    gain.gain.setValueAtTime(0.18, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.5);
-    setTimeout(() => ctx.close(), 600);
-  } catch {
-    /* Web Audio not available — silent fallback */
-  }
-}
-
-/* ─── Get persisted set of already-notified task IDs ─── */
-function getNotifiedIds() {
-  try { return new Set(JSON.parse(localStorage.getItem(NOTIFIED_KEY) || '[]')); }
-  catch { return new Set(); }
-}
-
-function saveNotifiedIds(set) {
-  localStorage.setItem(NOTIFIED_KEY, JSON.stringify([...set]));
-}
-
-/* ─── Get persisted notification log ─── */
-function getNotificationLog() {
-  try { return JSON.parse(localStorage.getItem(NOTIFICATION_LOG_KEY) || '[]'); }
-  catch { return []; }
-}
-
-function saveNotificationLog(log) {
-  localStorage.setItem(NOTIFICATION_LOG_KEY, JSON.stringify(log));
-}
+import { notificationService } from './services/NotificationService.js';
 
 /* ─── Request browser notification permission ─── */
 export function requestNotificationPermission() {
-  if (!('Notification' in window)) return Promise.resolve('denied');
-  if (Notification.permission === 'granted') return Promise.resolve('granted');
-  if (Notification.permission === 'denied') return Promise.resolve('denied');
-  return Notification.requestPermission();
+  return notificationService.requestPermission();
 }
 
 /* ─── The Hook ─── */
 export default function useNotifications(tasks, persistTasks, activities = [], session = null) {
   const [toasts, setToasts] = useState([]);
-  const [notifications, setNotifications] = useState(getNotificationLog);
-  const notifiedRef = useRef(getNotifiedIds());
+  const [notifications, setNotifications] = useState([]);
+  const notifiedRef = useRef(new Set());
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    async function loadData() {
+      const logs = await repository.getNotificationLog();
+      const notifs = await repository.getNotified();
+      setNotifications(logs);
+      notifiedRef.current = notifs;
+      setLoaded(true);
+    }
+    loadData();
+  }, []);
+
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
   
   const lastActivityIdRef = useRef(activities[0]?.id);
 
-  /* ─── Fire a notification for a task ─── */
-  const fireNotification = useCallback((task) => {
-    const now = new Date().toISOString();
-    const id = crypto.randomUUID();
+  /* ─── Handle Incoming Notification Events ─── */
+  useEffect(() => {
+    if (!loaded) return;
 
-    /* Play chime */
-    playChime();
+    const handleNotify = (e) => {
+      const task = e.detail;
+      const now = new Date().toISOString();
+      const id = crypto.randomUUID();
 
-    /* Browser notification */
-    if ('Notification' in window && Notification.permission === 'granted') {
-      try {
-        const n = new Notification(`⏰ ${task.title}`, {
-          body: task.description || 'Your reminder is due!',
-          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">✓</text></svg>',
-          tag: task.id,
-          requireInteraction: true,
-        });
-        n.onclick = () => { window.focus(); n.close(); };
-      } catch { /* Notification constructor may fail in some contexts */ }
-    }
+      const toast = {
+        id,
+        taskId: task.id,
+        title: task.title,
+        description: task.description,
+        firedAt: now,
+        dismissed: false,
+      };
+      setToasts(prev => [...prev.slice(-2), toast]);
 
-    /* In-app toast */
-    const toast = {
-      id,
-      taskId: task.id,
-      title: task.title,
-      description: task.description,
-      firedAt: now,
-      dismissed: false,
+      const logEntry = {
+        id,
+        taskId: task.id,
+        title: task.title,
+        description: task.description,
+        firedAt: now,
+        read: false,
+      };
+      setNotifications(prev => {
+        const next = [logEntry, ...prev].slice(0, 50);
+        repository.saveNotificationLog(next);
+        return next;
+      });
     };
-    setToasts(prev => [...prev.slice(-2), toast]); /* Keep max 3 */
 
-    /* Notification log */
-    const logEntry = {
-      id,
-      taskId: task.id,
-      title: task.title,
-      description: task.description,
-      firedAt: now,
-      read: false,
+    const handleAcknowledge = (e) => {
+      const taskId = e.detail;
+      notifiedRef.current.add(taskId);
+      repository.saveNotified(Array.from(notifiedRef.current));
+      setToasts(prev => prev.filter(t => t.taskId !== taskId));
     };
-    setNotifications(prev => {
-      const next = [logEntry, ...prev].slice(0, 50); /* Cap at 50 */
-      saveNotificationLog(next);
-      return next;
-    });
 
-    /* Mark as notified */
-    notifiedRef.current.add(task.id);
-    saveNotifiedIds(notifiedRef.current);
-  }, []);
+    window.addEventListener('flowlist:notify', handleNotify);
+    window.addEventListener('flowlist:acknowledge', handleAcknowledge);
+    return () => {
+      window.removeEventListener('flowlist:notify', handleNotify);
+      window.removeEventListener('flowlist:acknowledge', handleAcknowledge);
+    };
+  }, [loaded]);
 
   const fireActivityNotification = useCallback((act) => {
     const now = new Date().toISOString();
@@ -136,8 +98,6 @@ export default function useNotifications(tasks, persistTasks, activities = [], s
       body = `${act.actorId.split('@')[0]} added "${act.metadata.taskTitle}"`;
     }
 
-    playChime();
-
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
         const n = new Notification(`👥 ${title}`, { body, requireInteraction: false });
@@ -151,12 +111,13 @@ export default function useNotifications(tasks, persistTasks, activities = [], s
     const logEntry = { id, title, description: body, firedAt: now, read: false };
     setNotifications(prev => {
       const next = [logEntry, ...prev].slice(0, 50);
-      saveNotificationLog(next);
+      repository.saveNotificationLog(next);
       return next;
     });
   }, []);
 
   useEffect(() => {
+    if (!loaded) return;
     if (!session || activities.length === 0) return;
     
     const newActs = [];
@@ -172,42 +133,23 @@ export default function useNotifications(tasks, persistTasks, activities = [], s
     }
     
     lastActivityIdRef.current = activities[0].id;
-  }, [activities, session, fireActivityNotification]);
+  }, [activities, session, fireActivityNotification, loaded]);
 
-  /* ─── Check loop (every 15 seconds) ─── */
+
   useEffect(() => {
-    const check = () => {
-      const now = Date.now();
-      tasksRef.current.forEach(task => {
-        if (
-          task.remindAt &&
-          !task.completed &&
-          !notifiedRef.current.has(task.id) &&
-          new Date(task.remindAt).getTime() <= now
-        ) {
-          fireNotification(task);
-        }
-      });
-    };
-
-    check(); /* Run immediately on mount */
-    const interval = setInterval(check, 15_000);
-    return () => clearInterval(interval);
-  }, [fireNotification]);
+    if (!loaded) return;
+    notificationService.syncSchedules(tasks, notifiedRef.current);
+  }, [tasks, loaded]);
 
   /* ─── Dismiss a toast ─── */
   const dismissToast = useCallback((toastId) => {
+    const toast = toasts.find(t => t.id === toastId);
+    if (toast) {
+      notifiedRef.current.add(toast.taskId);
+      repository.saveNotified(Array.from(notifiedRef.current));
+    }
     setToasts(prev => prev.filter(t => t.id !== toastId));
-  }, []);
-
-  /* ─── Auto-dismiss toasts after 10 seconds ─── */
-  useEffect(() => {
-    if (toasts.length === 0) return;
-    const timers = toasts.map(toast =>
-      setTimeout(() => dismissToast(toast.id), 10_000)
-    );
-    return () => timers.forEach(clearTimeout);
-  }, [toasts, dismissToast]);
+  }, [toasts]);
 
   /* ─── Snooze a reminder ─── */
   const snoozeTask = useCallback((taskId, minutes) => {
@@ -217,7 +159,7 @@ export default function useNotifications(tasks, persistTasks, activities = [], s
     );
     /* Remove from notified set so it fires again */
     notifiedRef.current.delete(taskId);
-    saveNotifiedIds(notifiedRef.current);
+    repository.saveNotified(Array.from(notifiedRef.current));
     persistTasks(nextTasks);
 
     /* Dismiss any related toast */
@@ -234,10 +176,10 @@ export default function useNotifications(tasks, persistTasks, activities = [], s
   }, [persistTasks]);
 
   /* ─── Mark notification as read ─── */
-  const markRead = useCallback((notifId) => {
+  const markRead = useCallback((id) => {
     setNotifications(prev => {
-      const next = prev.map(n => n.id === notifId ? { ...n, read: true } : n);
-      saveNotificationLog(next);
+      const next = prev.map(n => n.id === id ? { ...n, read: true } : n);
+      repository.saveNotificationLog(next);
       return next;
     });
   }, []);
@@ -246,7 +188,7 @@ export default function useNotifications(tasks, persistTasks, activities = [], s
   const markAllRead = useCallback(() => {
     setNotifications(prev => {
       const next = prev.map(n => ({ ...n, read: true }));
-      saveNotificationLog(next);
+      repository.saveNotificationLog(next);
       return next;
     });
   }, []);
@@ -254,7 +196,7 @@ export default function useNotifications(tasks, persistTasks, activities = [], s
   /* ─── Clear notification log ─── */
   const clearNotifications = useCallback(() => {
     setNotifications([]);
-    saveNotificationLog([]);
+    repository.saveNotificationLog([]);
   }, []);
 
   /* ─── Unread count ─── */
@@ -277,7 +219,7 @@ export default function useNotifications(tasks, persistTasks, activities = [], s
         changed = true;
       }
     }
-    if (changed) saveNotifiedIds(notifiedRef.current);
+    if (changed) repository.saveNotified(Array.from(notifiedRef.current));
   }, [tasks]);
 
   return {

@@ -1,10 +1,11 @@
-import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import React, { Suspense, useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import Ballpit from './Ballpit.jsx';
+const Ballpit = React.lazy(() => import('./Ballpit.jsx'));
 import ThemeToggle from './ThemeToggle.jsx';
 import LoginPage from './LoginPage.jsx';
 import ToastStack from './ToastStack.jsx';
 import NotificationCenter from './NotificationCenter.jsx';
+import PrivacyPolicy from './PrivacyPolicy.jsx';
 import useNotifications, { requestNotificationPermission } from './useNotifications.jsx';
 import CalendarView from './CalendarView.jsx';
 import ProjectsView from './ProjectsView.jsx';
@@ -16,32 +17,7 @@ import { getRecurrenceLabel, getNextOccurrenceDate, generateNextTaskOccurrence }
 import { migrateToCollaborationModel } from './utils/collaboration.js';
 import '../styles.css';
 
-const STORAGE_KEY = 'flowlist-tasks-v1';
-const SESSION_KEY = 'flowlist-session-v1';
-const PROJECTS_KEY = 'flowlist-projects-v1';
-const PRIORITIES_KEY = 'flowlist-priorities-v1';
-const RULES_KEY = 'flowlist-rules-v1';
-const TAGS_KEY = 'flowlist-tags-v1';
-const SAVED_VIEWS_KEY = 'flowlist-saved-views-v1';
-const ACTIVITIES_KEY = 'flowlist-activities-v1';
-
-const defaultPriorities = [
-  { id: 'high', name: 'High', icon: '🔴', color: '#ffcdd2', rank: 1 },
-  { id: 'medium', name: 'Medium', icon: '🟡', color: '#ffecb3', rank: 2 },
-  { id: 'low', name: 'Low', icon: '🔵', color: '#bbdefb', rank: 3 }
-];
-
-function formatDate(value) {
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
-  }).format(new Date(value));
-}
-
-function getSession() {
-  const stored = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
-  if (!stored) return null;
-  try { return JSON.parse(stored); } catch { return null; }
-}
+import { repository } from './data/repository.js';
 
 function fuzzyMatch(pattern, str) {
   let pIdx = 0, sIdx = 0;
@@ -81,34 +57,117 @@ function getAnimatedBgDefault() {
 }
 
 function App() {
-  const [session, setSession] = useState(getSession);
-  const [animatedBackground, setAnimatedBackground] = useState(() => {
-    const stored = localStorage.getItem('flowlist-animated-bg');
-    if (stored !== null) return stored === 'true';
-    return getAnimatedBgDefault();
-  });
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+  const [session, setSession] = useState(null);
+  const [animatedBackground, setAnimatedBackground] = useState(true);
+  const [tasks, setTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+  const [priorities, setPriorities] = useState([]);
+  const [rules, setRules] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [savedViews, setSavedViews] = useState([]);
+  const [listType, setListType] = useState('tasks');
+  const [draggedTaskId, setDraggedTaskId] = useState(null);
+
+  useEffect(() => {
+    async function loadData() {
+      const [
+        sess, animBg, loadedTasks, loadedProjects,
+        loadedPriorities, loadedRules, loadedTags,
+        loadedViews, loadedActivities
+      ] = await Promise.all([
+        repository.getSession(),
+        repository.getAnimatedBg(),
+        repository.getTasks(),
+        repository.getProjects(),
+        repository.getPriorities(),
+        repository.getRules(),
+        repository.getTags(),
+        repository.getSavedViews(),
+        repository.getActivities()
+      ]);
+
+      setSession(sess);
+      setAnimatedBackground(animBg);
+      setTasks(loadedTasks);
+      setProjects(loadedProjects);
+      setPriorities(loadedPriorities);
+      setRules(loadedRules);
+      setTags(loadedTags);
+      setSavedViews(loadedViews);
+      setActivities(loadedActivities);
+
+      // Start Realtime Subscription if we have a non-guest session
+      if (sess && !sess.isGuest) {
+        repository.subscribeToChanges(async (table, payload) => {
+          if (table === 'tasks') {
+            const updatedTasks = await repository.getTasks();
+            setTasks([...updatedTasks]); // clone to force React re-render just in case
+          } else if (table === 'projects') {
+            const updatedProjects = await repository.getProjects();
+            setProjects([...updatedProjects]);
+          }
+        });
+      }
+      setDataLoaded(true);
+    }
+    loadData();
+
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      repository.unsubscribeFromChanges();
+    };
+  }, []);
 
   const toggleAnimatedBackground = (val) => {
     setAnimatedBackground(val);
-    localStorage.setItem('flowlist-animated-bg', String(val));
+    repository.saveAnimatedBg(val);
   };
-  const [tasks, setTasks] = useState(() => JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
-  const [projects, setProjects] = useState(() => JSON.parse(localStorage.getItem(PROJECTS_KEY) || '[]'));
-  const [priorities, setPriorities] = useState(() => {
-    const stored = localStorage.getItem(PRIORITIES_KEY);
-    return stored ? JSON.parse(stored) : defaultPriorities;
-  });
-  const [rules, setRules] = useState(() => JSON.parse(localStorage.getItem(RULES_KEY) || '[]'));
-  const [tags, setTags] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(TAGS_KEY)) || []; } catch { return []; }
-  });
-  const [savedViews, setSavedViews] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(SAVED_VIEWS_KEY)) || []; } catch { return []; }
-  });
-  const [listType, setListType] = useState('tasks');
+  const [isMobileViewport, setIsMobileViewport] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth <= 760
+  );
   const [homeFormOpen, setHomeFormOpen] = useState(() =>
     typeof window === 'undefined' || window.innerWidth > 760
   );
+  
+  /* ─── PWA Install Prompt ─── */
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
+
+  /* Keep isMobileViewport in sync with viewport changes (resize/rotation) */
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 760px)');
+    const handler = (e) => {
+      setIsMobileViewport(e.matches);
+      if (!e.matches) setHomeFormOpen(true);   // desktop: always show form
+    };
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
   const [filter, setFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -130,33 +189,31 @@ function App() {
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
   const [bulkTagModalOpen, setBulkTagModalOpen] = useState(false);
   const [bulkTagsToAdd, setBulkTagsToAdd] = useState(new Set());
-  const [activities, setActivities] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(ACTIVITIES_KEY)) || []; } catch { return []; }
-  });
+  const [activities, setActivities] = useState([]);
 
   // Run migration when session is loaded
   useEffect(() => {
-    if (session) {
+    if (session && dataLoaded) {
       const { projectsChanged, nextProjects, tasksChanged, nextTasks } = migrateToCollaborationModel(projects, tasks, session.email);
       if (projectsChanged) {
         setProjects(nextProjects);
-        localStorage.setItem(PROJECTS_KEY, JSON.stringify(nextProjects));
+        repository.saveProjects(nextProjects);
       }
       if (tasksChanged) {
         setTasks(nextTasks);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextTasks));
+        repository.saveTasks(nextTasks);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, dataLoaded]);
 
   useEffect(() => {
-    localStorage.setItem(TAGS_KEY, JSON.stringify(tags));
-  }, [tags]);
+    if (dataLoaded) repository.saveTags(tags);
+  }, [tags, dataLoaded]);
 
   useEffect(() => {
-    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(savedViews));
-  }, [savedViews]);
+    if (dataLoaded) repository.saveSavedViews(savedViews);
+  }, [savedViews, dataLoaded]);
 
   /* ─── Global Focus Timer ─── */
   const [timerDuration, setTimerDuration] = useState(25 * 60);
@@ -216,27 +273,27 @@ function App() {
 
   const persist = useCallback((nextTasks) => {
     setTasks(nextTasks);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextTasks));
+    repository.saveTasks(nextTasks);
   }, []);
 
   const persistProjects = useCallback((nextProjects) => {
     setProjects(nextProjects);
-    localStorage.setItem(PROJECTS_KEY, JSON.stringify(nextProjects));
+    repository.saveProjects(nextProjects);
   }, []);
 
   const persistPriorities = useCallback((nextPriorities) => {
     setPriorities(nextPriorities);
-    localStorage.setItem(PRIORITIES_KEY, JSON.stringify(nextPriorities));
+    repository.savePriorities(nextPriorities);
   }, []);
 
   const persistRules = useCallback((nextRules) => {
     setRules(nextRules);
-    localStorage.setItem(RULES_KEY, JSON.stringify(nextRules));
+    repository.saveRules(nextRules);
   }, []);
 
   const persistActivities = useCallback((nextActivities) => {
     setActivities(nextActivities);
-    localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(nextActivities));
+    repository.saveActivities(nextActivities);
   }, []);
 
   const resetForm = () => { setEditingId(null); setTitle(''); setDescription(''); setRemindAt(''); setProjectId(''); setPriority(''); setTagInput(''); setShowAdvanced(false); setRecurrenceFrequency('none'); setRecurrenceInterval(1); setRecurrenceWeekdays([]); setRecurrenceEndDate(''); };
@@ -411,25 +468,43 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem(SESSION_KEY);
-    sessionStorage.removeItem(SESSION_KEY);
+    repository.clearSession();
     setSession(null);
   };
 
-  /* ─── Task Drag and Drop ─── */
-  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  /* ─── Show loading state if data not hydrated ─── */
+  if (!dataLoaded) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', alignItems: 'center', justifyContent: 'center', color: 'var(--ink)', background: 'var(--cream)' }}>
+        <div className="login-logo-circle" style={{ width: '64px', height: '64px', fontSize: '32px', marginBottom: '20px', animation: 'loginOrbFloat 3s ease-in-out infinite' }}>✓</div>
+        <div style={{ fontWeight: 700, fontSize: '18px', letterSpacing: '-0.03em' }}>Flowlist</div>
+        <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '8px' }}>Loading workspace...</div>
+      </div>
+    );
+  }
 
-  const handleTaskDragStart = (e, taskId) => {
+  /* ─── Show Privacy Policy ─── */
+  if (showPrivacyPolicy) {
+    return <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} />;
+  }
+
+  /* ─── Show login page if not authenticated ─── */
+  if (!session) {
+    return <LoginPage onLogin={handleLogin} onShowPrivacyPolicy={() => setShowPrivacyPolicy(true)} />;
+  }
+
+  const handleTaskPointerDown = (e, taskId) => {
+    // Only drag if grabbing the empty area or explicitly the card, not buttons
+    if (e.target.closest('button, input, textarea, a, .checkbox')) return;
     setDraggedTaskId(taskId);
-    e.dataTransfer.effectAllowed = 'move';
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
-  const handleTaskDrop = (e, dropTargetId) => {
-    e.preventDefault();
-    if (draggedTaskId === null || draggedTaskId === dropTargetId) return;
+  const handleTaskPointerEnter = (e, hoverTargetId) => {
+    if (draggedTaskId === null || draggedTaskId === hoverTargetId) return;
 
     const dragIndex = tasks.findIndex(t => t.id === draggedTaskId);
-    const dropIndex = tasks.findIndex(t => t.id === dropTargetId);
+    const dropIndex = tasks.findIndex(t => t.id === hoverTargetId);
 
     if (dragIndex === -1 || dropIndex === -1) return;
 
@@ -438,7 +513,14 @@ function App() {
     nextTasks.splice(dropIndex, 0, draggedItem);
 
     persist(nextTasks);
+    // Don't setDraggedTaskId(null) yet, user is still dragging
+  };
+
+  const handleTaskPointerUp = (e) => {
     setDraggedTaskId(null);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
   };
 
   /* ─── Show login page if not authenticated ─── */
@@ -449,19 +531,21 @@ function App() {
   /* ─── Main app (authenticated) ─── */
   return <>
     {animatedBackground ? (
-      <div className="ballpit-container" aria-hidden="true">
-        <Ballpit
-          count={typeof window !== 'undefined' && window.innerWidth < 768 ? 15 : 60}
-          colors={[0x6254e7, 0x9e90ff, 0x8ac6ff, 0xf5b267, 0xffb7a4]}
-          radiusCm={1}
-          gravity={0}
-          friction={0.94}
-          wallBounce={0.95}
-          maxVelocity={0.65}
-          cursorForce={8}
-          followCursor={typeof window !== 'undefined' && window.innerWidth >= 768}
-        />
-      </div>
+      <Suspense fallback={null}>
+        <div className="ballpit-container" aria-hidden="true">
+          <Ballpit
+            count={typeof window !== 'undefined' && window.innerWidth < 768 ? 15 : 60}
+            colors={[0x6254e7, 0x9e90ff, 0x8ac6ff, 0xf5b267, 0xffb7a4]}
+            radiusCm={1}
+            gravity={0}
+            friction={0.94}
+            wallBounce={0.95}
+            maxVelocity={0.65}
+            cursorForce={8}
+            followCursor={typeof window !== 'undefined' && window.innerWidth >= 768}
+          />
+        </div>
+      </Suspense>
     ) : (
       <div className="css-orbs-background" aria-hidden="true">
         <div className="orb-1"></div>
@@ -516,6 +600,11 @@ function App() {
         <button className={`side-nav-link ${currentView === 'settings' ? 'active' : ''}`} type="button" onClick={() => { setCurrentView('settings'); setSidebarOpen(false); }}>
           <span className="side-nav-icon">⚙</span><span>Settings</span>
         </button>
+        {deferredPrompt && (
+          <button className="side-nav-link install-link" type="button" onClick={handleInstallClick}>
+            <span className="side-nav-icon">⬇</span><span>Install App</span>
+          </button>
+        )}
         <button className="side-nav-link signout-link" type="button" onClick={handleLogout}>
           <span className="side-nav-icon">⎋</span><span>Sign out</span>
         </button>
@@ -536,6 +625,11 @@ function App() {
           </div>
           <div className="hero-actions">
             <p className="user-greeting">Hello, <strong>{session.name}</strong></p>
+            {isOffline && (
+              <span style={{ fontSize: '11px', fontWeight: 700, background: 'color-mix(in srgb, #f5b267 20%, transparent)', color: '#d98c30', padding: '4px 8px', borderRadius: '8px', marginLeft: '8px' }}>
+                OFFLINE
+              </span>
+            )}
             <NotificationCenter
               notifications={notifications}
               unreadCount={unreadCount}
@@ -543,14 +637,16 @@ function App() {
               onMarkAllRead={markAllRead}
               onClear={clearNotifications}
             />
-            <button className="logout-button" type="button" onClick={handleLogout}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              Sign out
-            </button>
+            {!isMobileViewport && (
+              <button className="logout-button" type="button" onClick={handleLogout}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Sign out
+              </button>
+            )}
           </div>
         </div>
         <div className="today-card" aria-label="Today's date">
@@ -593,6 +689,7 @@ function App() {
         />
       ) : currentView === 'settings' ? (
         <SettingsView
+          session={session}
           activeTab={settingsTab}
           setActiveTab={setSettingsTab}
           priorities={priorities}
@@ -604,6 +701,7 @@ function App() {
           setSavedViews={setSavedViews}
           animatedBackground={animatedBackground}
           onToggleAnimatedBackground={toggleAnimatedBackground}
+          onShowPrivacyPolicy={() => setShowPrivacyPolicy(true)}
           onBulkUpdateTasks={persist}
           onSavePriority={p => {
             const exists = priorities.find(x => x.id === p.id);
@@ -704,8 +802,8 @@ function App() {
               </label>
 
               {tagAutocomplete.active && (
-                <div className="tag-autocomplete-popover" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: '12px', zIndex: 10, padding: '8px', boxShadow: '0 10px 30px var(--shadow)', marginTop: '4px' }}>
-                  <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'var(--muted)', fontWeight: 600 }}>Select a tag</p>
+                <div className="tag-autocomplete-popover" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: '12px', zIndex: 10, padding: '8px', boxShadow: '0 10px 30px var(--shadow)', marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'var(--muted)', fontWeight: 600, position: 'sticky', top: 0, background: 'var(--paper)', paddingBottom: '4px' }}>Select a tag</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {(() => {
                       const query = tagAutocomplete.query;
@@ -847,11 +945,11 @@ function App() {
               {visibleTasks.map(task => <article
                 className={`task-card ${task.completed ? 'completed' : ''} ${draggedTaskId === task.id ? 'dragging' : ''}`}
                 key={task.id}
-                draggable={true}
-                onDragStart={(e) => handleTaskDragStart(e, task.id)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => handleTaskDrop(e, task.id)}
-                onDragEnd={() => setDraggedTaskId(null)}
+                onPointerDown={(e) => handleTaskPointerDown(e, task.id)}
+                onPointerEnter={(e) => handleTaskPointerEnter(e, task.id)}
+                onPointerUp={handleTaskPointerUp}
+                onPointerCancel={handleTaskPointerUp}
+                style={{ touchAction: 'none' }}
               >
                 {bulkSelectMode ? (
                   <button className="checkbox" style={selectedTaskIds.has(task.id) ? { borderColor: 'var(--purple)', background: 'var(--purple)' } : {}} type="button" onClick={() => {
@@ -878,7 +976,7 @@ function App() {
                       {task.priority && priorities.find(p => p.id === task.priority) && (() => {
                         const prio = priorities.find(p => p.id === task.priority);
                         return (
-                          <span className="badge priority-badge" style={{ borderColor: prio.color, color: prio.color, backgroundColor: 'color-mix(in srgb, var(--paper) 70%, transparent)' }}>
+                          <span className="badge priority-badge" style={{ '--badge-color': prio.color }}>
                             {prio.icon} {prio.name}
                           </span>
                         );
@@ -895,7 +993,7 @@ function App() {
                   )}
 
                   {task.recurrence && task.recurrence.frequency !== 'none' && (
-                    <p className="recurrence-label" style={{ fontSize: '11px', color: 'var(--purple)', marginTop: '4px', fontWeight: 600 }}>
+                    <p className="recurrence-label">
                       ↻ {getRecurrenceLabel(task.recurrence)}
                     </p>
                   )}
@@ -921,7 +1019,7 @@ function App() {
     </main>
 
     {bulkSelectMode && selectedTaskIds.size > 0 && (
-      <div className="bulk-action-bar" style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: 'var(--paper)', borderRadius: '100px', padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 20px 40px var(--shadow)', zIndex: 100, border: '1px solid var(--line)' }}>
+      <div className="bulk-action-bar">
         <span style={{ fontWeight: 600 }}>{selectedTaskIds.size} task{selectedTaskIds.size !== 1 && 's'} selected</span>
         <button className="primary-button" onClick={() => setBulkTagModalOpen(true)}>Manage Tags</button>
         <button className="text-button" style={{ color: 'var(--danger)' }} onClick={() => {
@@ -933,10 +1031,10 @@ function App() {
     )}
 
     {bulkTagModalOpen && (
-      <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="modal-content" style={{ background: 'var(--paper)', padding: '24px', borderRadius: '16px', width: '400px', maxWidth: '90%' }}>
+      <div className="modal-overlay">
+        <div className="modal-content">
           <h3>Bulk Manage Tags</h3>
-          <p style={{ color: 'var(--muted)', marginBottom: '16px' }}>Select tags to add to all {selectedTaskIds.size} selected tasks.</p>
+          <p>Select tags to add to all {selectedTaskIds.size} selected tasks.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto', marginBottom: '16px' }}>
             {tags.map(t => (
               <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', background: 'var(--bg)', borderRadius: '8px', cursor: 'pointer' }}>

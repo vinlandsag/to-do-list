@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { repository } from './data/repository';
 
 export default function SettingsView({ 
+  session,
   activeTab,
   setActiveTab,
   priorities, 
@@ -16,7 +18,9 @@ export default function SettingsView({
   savedViews,
   setSavedViews,
   animatedBackground,
-  onToggleAnimatedBackground
+  onToggleAnimatedBackground,
+  onShowPrivacyPolicy,
+  onBulkUpdateTasks
 }) {
   const [editingPriorityId, setEditingPriorityId] = useState(null);
   const [editingTagId, setEditingTagId] = useState(null);
@@ -137,6 +141,7 @@ export default function SettingsView({
           <button className={`tab-btn ${activeTab === 'rules' ? 'active' : ''}`} onClick={() => setActiveTab('rules')}>Auto Rules</button>
           <button className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>Insights</button>
           <button className={`tab-btn ${activeTab === 'appearance' ? 'active' : ''}`} onClick={() => setActiveTab('appearance')}>Appearance</button>
+          <button className={`tab-btn ${activeTab === 'account' ? 'active' : ''}`} onClick={() => setActiveTab('account')}>Account</button>
         </div>
       </header>
 
@@ -357,6 +362,66 @@ export default function SettingsView({
               <span style={{ fontSize: '14px', fontWeight: 600 }}>Enable Animated Background</span>
             </label>
           </div>
+        </div>
+      )}
+      {activeTab === 'account' && (
+        <div className="settings-section">
+          <h3>Data & Account</h3>
+          <p className="settings-desc">Manage your data portability and account settings.</p>
+
+          <div className="insight-card" style={{ marginBottom: '16px' }}>
+            <h4 style={{ marginBottom: '8px' }}>Export Data</h4>
+            <p className="settings-desc" style={{ marginBottom: '16px' }}>
+              Download a complete JSON backup of all your tasks, projects, tags, and settings.
+            </p>
+            <button className="primary-button" onClick={() => repository.exportData()}>Export My Data (JSON)</button>
+          </div>
+
+          <div className="insight-card" style={{ marginBottom: '16px' }}>
+            <h4 style={{ marginBottom: '8px' }}>Legal</h4>
+            <p className="settings-desc" style={{ marginBottom: '16px' }}>
+              Review our privacy practices and data handling policies.
+            </p>
+            <button className="primary-button" style={{ background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', boxShadow: 'none' }} onClick={onShowPrivacyPolicy}>View Privacy Policy</button>
+          </div>
+
+          {session?.isGuest ? (
+            <div className="insight-card" style={{ border: '1px solid color-mix(in srgb, #ff4757 30%, transparent)', background: 'color-mix(in srgb, #ff4757 5%, var(--paper))' }}>
+              <h4 style={{ color: '#ff4757', marginBottom: '8px' }}>Guest Mode</h4>
+              <p className="settings-desc" style={{ marginBottom: '16px' }}>
+                Your data is stored only on this device. It will not sync to the cloud.
+              </p>
+              <button 
+                className="primary-button" 
+                style={{ background: '#ff4757', boxShadow: 'none' }} 
+                onClick={() => {
+                  if (window.confirm("Are you absolutely sure you want to clear your local guest data? This cannot be undone.")) {
+                    repository.clearGuestData();
+                  }
+                }}
+              >
+                Clear Guest Data & Sign Out
+              </button>
+            </div>
+          ) : (
+            <div className="insight-card" style={{ border: '1px solid color-mix(in srgb, #ff4757 30%, transparent)', background: 'color-mix(in srgb, #ff4757 5%, var(--paper))' }}>
+              <h4 style={{ color: '#ff4757', marginBottom: '8px' }}>Danger Zone</h4>
+              <p className="settings-desc" style={{ marginBottom: '16px' }}>
+                Permanently delete all your local and cloud data. This action cannot be undone.
+              </p>
+              <button 
+                className="primary-button" 
+                style={{ background: '#ff4757', boxShadow: 'none' }} 
+                onClick={() => {
+                  if (window.confirm("Are you absolutely sure you want to permanently delete your account and all associated data?")) {
+                    repository.deleteAccount();
+                  }
+                }}
+              >
+                Delete Account & Data
+              </button>
+            </div>
+          )}
         </div>
       )}
 

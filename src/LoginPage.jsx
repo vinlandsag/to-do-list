@@ -1,17 +1,8 @@
-import { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import ThemeToggle from './ThemeToggle.jsx';
-import Ballpit from './Ballpit.jsx';
+const Ballpit = React.lazy(() => import('./Ballpit.jsx'));
 
-const AUTH_KEY = 'flowlist-users-v1';
-const SESSION_KEY = 'flowlist-session-v1';
-
-function getUsers() {
-  return JSON.parse(localStorage.getItem(AUTH_KEY) || '{}');
-}
-
-function saveUsers(users) {
-  localStorage.setItem(AUTH_KEY, JSON.stringify(users));
-}
+import { repository, supabase } from './data/repository.js';
 
 /* Simple hash for demo purposes — not cryptographically secure */
 function hashPassword(password) {
@@ -22,7 +13,7 @@ function hashPassword(password) {
   return hash.toString(36);
 }
 
-export default function LoginPage({ onLogin }) {
+export default function LoginPage({ onLogin, onShowPrivacyPolicy }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,7 +29,12 @@ export default function LoginPage({ onLogin }) {
     setTimeout(() => setShake(false), 500);
   };
 
-  const handleSubmit = (event) => {
+  const handleGuestLogin = async () => {
+    const guestSession = await repository.createGuestSession();
+    onLogin(guestSession);
+  };
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setSuccess('');
@@ -52,38 +48,52 @@ export default function LoginPage({ onLogin }) {
       return;
     }
 
-    const users = getUsers();
+    if (!supabase) {
+      setError('Supabase is not configured. Please check your .env file.');
+      triggerShake();
+      return;
+    }
 
     if (isSignUp) {
-      if (users[trimmedEmail]) {
-        setError('An account with this email already exists.');
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password,
+        options: {
+          data: { name: trimmedName || trimmedEmail.split('@')[0] }
+        }
+      });
+
+      if (signUpError) {
+        setError(signUpError.message);
         triggerShake();
         return;
       }
-      users[trimmedEmail] = {
-        name: trimmedName || trimmedEmail.split('@')[0],
-        passwordHash: hashPassword(password),
-        createdAt: new Date().toISOString(),
-      };
-      saveUsers(users);
+
       setSuccess('Account created! Signing you in…');
-      setTimeout(() => {
-        const session = { email: trimmedEmail, name: users[trimmedEmail].name };
-        if (remember) localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-        else sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-        onLogin(session);
+      setTimeout(async () => {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session) {
+          const s = { email: trimmedEmail, name: sessionData.session.user.user_metadata?.name || trimmedEmail.split('@')[0] };
+          onLogin(s);
+        } else {
+          setError('Please check your email to verify your account.');
+          triggerShake();
+        }
       }, 800);
     } else {
-      const user = users[trimmedEmail];
-      if (!user || user.passwordHash !== hashPassword(password)) {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password
+      });
+
+      if (signInError) {
         setError('Invalid email or password.');
         triggerShake();
         return;
       }
-      const session = { email: trimmedEmail, name: user.name };
-      if (remember) localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-      else sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-      onLogin(session);
+      
+      const s = { email: trimmedEmail, name: data.user.user_metadata?.name || trimmedEmail.split('@')[0] };
+      onLogin(s);
     }
   };
 
@@ -96,19 +106,21 @@ export default function LoginPage({ onLogin }) {
   return (
     <div className="login-page">
       {/* Ballpit background for visual consistency */}
-      <div className="ballpit-container" aria-hidden="true">
-        <Ballpit
-          count={typeof window !== 'undefined' && window.innerWidth < 768 ? 15 : 60}
-          colors={[0x6254e7, 0x9e90ff, 0x8ac6ff, 0xf5b267, 0xffb7a4]}
-          radiusCm={1}
-          gravity={0}
-          friction={0.94}
-          wallBounce={0.95}
-          maxVelocity={0.5}
-          cursorForce={6}
-          followCursor={typeof window !== 'undefined' && window.innerWidth >= 768}
-        />
-      </div>
+      <Suspense fallback={null}>
+        <div className="ballpit-container" aria-hidden="true">
+          <Ballpit
+            count={typeof window !== 'undefined' && window.innerWidth < 768 ? 15 : 60}
+            colors={[0x6254e7, 0x9e90ff, 0x8ac6ff, 0xf5b267, 0xffb7a4]}
+            radiusCm={1}
+            gravity={0}
+            friction={0.94}
+            wallBounce={0.95}
+            maxVelocity={0.5}
+            cursorForce={6}
+            followCursor={typeof window !== 'undefined' && window.innerWidth >= 768}
+          />
+        </div>
+      </Suspense>
 
       {/* Floating decorative orbs */}
       <div className="login-orbs" aria-hidden="true">
@@ -276,6 +288,29 @@ export default function LoginPage({ onLogin }) {
               {isSignUp ? 'Sign in' : 'Sign up'}
             </button>
           </p>
+          <div style={{ margin: '16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+            <span style={{ fontSize: '12px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Or</span>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+          </div>
+          <button 
+            type="button" 
+            className="login-submit" 
+            onClick={handleGuestLogin}
+            style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--fg)', marginBottom: '12px' }}
+          >
+            <span className="login-submit-text">Continue as Guest</span>
+          </button>
+          <p style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.4' }}>
+            Guest mode keeps all your data locally on this device. It will not sync to the cloud.
+          </p>
+          <button 
+            type="button"
+            onClick={onShowPrivacyPolicy}
+            style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '11px', textDecoration: 'underline', marginTop: '16px', cursor: 'pointer' }}
+          >
+            Privacy Policy
+          </button>
         </div>
       </div>
     </div>

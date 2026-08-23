@@ -1,19 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import { repository } from './data/repository.js';
 
 const ThemeToggle = () => {
-  // Initialize state from localStorage or default to 'light'
-  const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem('theme');
-    // Also check user's system preference
-    const userPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    return savedTheme || (userPrefersDark ? 'dark' : 'light');
-  });
+  const [theme, setTheme] = useState('light');
+  const [loaded, setLoaded] = useState(false);
 
-  // Effect to apply the theme to the body and save to localStorage
   useEffect(() => {
-    document.body.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    async function loadTheme() {
+      let savedTheme = await repository.getTheme();
+      if (!savedTheme) {
+        const userPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        savedTheme = userPrefersDark ? 'dark' : 'light';
+      }
+      setTheme(savedTheme);
+      setLoaded(true);
+    }
+    loadTheme();
+  }, []);
+
+  useEffect(() => {
+    if (loaded) {
+      document.body.setAttribute('data-theme', theme);
+      repository.saveTheme(theme);
+    }
+  }, [theme, loaded]);
 
   const toggleTheme = () => {
     setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
