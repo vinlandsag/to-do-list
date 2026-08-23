@@ -177,9 +177,9 @@ export default function SettingsView({
 
           <form className="add-card mt-4" onSubmit={handleSavePriority}>
             <h4>{editingPriorityId ? 'Edit Priority' : 'Add Priority'}</h4>
-            <div className="form-row-2">
-              <label><span>Name</span><input value={priorityForm.name} onChange={e => setPriorityForm({...priorityForm, name: e.target.value})} placeholder="e.g. Critical" required /></label>
-              <label><span>Icon</span><input value={priorityForm.icon} onChange={e => setPriorityForm({...priorityForm, icon: e.target.value})} maxLength="2" /></label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              <label style={{ flex: '1 1 150px' }}><span>Name</span><input value={priorityForm.name} onChange={e => setPriorityForm({...priorityForm, name: e.target.value})} placeholder="e.g. Critical" required /></label>
+              <label style={{ flex: '0 0 80px' }}><span>Icon</span><input value={priorityForm.icon} onChange={e => setPriorityForm({...priorityForm, icon: e.target.value})} maxLength="2" /></label>
             </div>
             <label><span>Brand Color</span>
               <input type="color" value={priorityForm.color} onChange={e => setPriorityForm({...priorityForm, color: e.target.value})} className="color-picker" />
@@ -231,14 +231,14 @@ export default function SettingsView({
           <section>
             <h3>{editingTagId ? 'Edit Tag' : 'New Tag'}</h3>
             <form className="add-card" onSubmit={handleSaveTag}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 80px', gap: '8px' }}>
-                <label><span>Name (without #)</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                <label style={{ flex: '1 1 120px' }}><span>Name (without #)</span>
                   <input value={tagForm.name} onChange={e => setTagForm({ ...tagForm, name: e.target.value })} required placeholder="e.g. urgent" />
                 </label>
-                <label><span>Icon</span>
+                <label style={{ flex: '0 0 70px' }}><span>Icon</span>
                   <input value={tagForm.icon} onChange={e => setTagForm({ ...tagForm, icon: e.target.value })} />
                 </label>
-                <label><span>Color</span>
+                <label style={{ flex: '0 0 80px' }}><span>Color</span>
                   <input type="color" value={tagForm.color} onChange={e => setTagForm({ ...tagForm, color: e.target.value })} style={{ width: '100%', height: '42px', padding: 0 }} />
                 </label>
               </div>
@@ -278,23 +278,23 @@ export default function SettingsView({
 
           <form className="add-card mt-4" onSubmit={handleSaveRule}>
             <h4>Create Rule</h4>
-            <div className="advanced-options-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-              <label><span>If</span>
+            <div className="advanced-options-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              <label style={{ flex: '1 1 100px' }}><span>If</span>
                 <select value={ruleForm.conditionField} onChange={e => setRuleForm({...ruleForm, conditionField: e.target.value})}>
                   <option value="title">Title</option>
                   <option value="tags">Tag</option>
                 </select>
               </label>
-              <label><span>Contains</span>
+              <label style={{ flex: '1 1 100px' }}><span>Contains</span>
                 <input value={ruleForm.conditionValue} onChange={e => setRuleForm({...ruleForm, conditionValue: e.target.value})} placeholder="e.g. urgent" required />
               </label>
-              <label><span>Action Type</span>
+              <label style={{ flex: '1 1 100px' }}><span>Action Type</span>
                 <select value={ruleForm.actionType || 'priority'} onChange={e => setRuleForm({...ruleForm, actionType: e.target.value})}>
                   <option value="priority">Set Priority</option>
                   <option value="tag">Apply Tag</option>
                 </select>
               </label>
-              <label style={{ gridColumn: 'span 3' }}><span>{ruleForm.actionType === 'tag' ? 'Apply Tag' : 'Set Priority To'}</span>
+              <label style={{ flex: '1 1 100%' }}><span>{ruleForm.actionType === 'tag' ? 'Apply Tag' : 'Set Priority To'}</span>
                 {ruleForm.actionType === 'tag' ? (
                   <select value={ruleForm.tagId} onChange={e => setRuleForm({...ruleForm, tagId: e.target.value})} required>
                     <option value="">Select tag...</option>
