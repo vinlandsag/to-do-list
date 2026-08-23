@@ -304,13 +304,27 @@ export default function LoginPage({ onLogin, onShowPrivacyPolicy }) {
           <p style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.4' }}>
             Guest mode keeps all your data locally on this device. It will not sync to the cloud.
           </p>
-          <button 
-            type="button"
-            onClick={onShowPrivacyPolicy}
-            style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '11px', textDecoration: 'underline', marginTop: '16px', cursor: 'pointer' }}
-          >
-            Privacy Policy
-          </button>
+          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginTop: '16px' }}>
+            <button 
+              type="button"
+              onClick={onShowPrivacyPolicy}
+              style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '11px', textDecoration: 'underline', cursor: 'pointer' }}
+            >
+              Privacy Policy
+            </button>
+            <a 
+              href="/flowlist.apk" 
+              download="flowlist.apk"
+              style={{ color: 'var(--purple)', fontSize: '11px', textDecoration: 'underline', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Download App
+            </a>
+          </div>
         </div>
       </div>
     </div>
