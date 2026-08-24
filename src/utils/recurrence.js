@@ -143,6 +143,7 @@ export function generateNextTaskOccurrence(task, nextDate) {
   newTask.completed = false;
   newTask.completedAt = null;
   newTask.createdAt = new Date().toISOString();
+  newTask.appearAt = nextDate.toISOString();
   
   if (Array.isArray(newTask.subtasks)) {
     newTask.subtasks.forEach(sub => {

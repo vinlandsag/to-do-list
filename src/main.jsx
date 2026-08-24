@@ -286,7 +286,12 @@ function App() {
   }, []);
 
   const today = useMemo(() => new Date(), []);
-  const currentTasks = tasks.filter(task => (task.type || 'tasks') === listType && !task.projectId);
+  const currentTasks = tasks.filter(task => {
+    if ((task.type || 'tasks') !== listType) return false;
+    if (task.projectId) return false;
+    if (task.appearAt && new Date(task.appearAt) > new Date()) return false;
+    return true;
+  });
   const visibleTasks = currentTasks.filter(task => {
     const matchesStatus = filter === 'all' || (filter === 'completed' ? task.completed : !task.completed);
     const matchesTag = tagFilter ? task.tags?.some(t => t === tagFilter || t.startsWith(tagFilter + '/')) : true;
@@ -634,11 +639,11 @@ function App() {
 
       <nav className="side-nav-links">
         <p className="side-nav-label">Workspace</p>
-        <button className={`side-nav-link ${currentView === 'home' && !tagFilter && listType !== 'quests' ? 'active' : ''}`} type="button" onClick={() => { setCurrentView('home'); setListType('tasks'); setTagFilter(null); setSidebarOpen(false); }}>
+        <button className={`side-nav-link ${currentView === 'home' && !tagFilter ? 'active' : ''}`} type="button" onClick={() => { setCurrentView('home'); setListType('tasks'); setTagFilter(null); setSidebarOpen(false); }}>
           <span className="side-nav-icon">⌂</span><span>Home</span>
         </button>
-        <button className={`side-nav-link ${currentView === 'home' && listType === 'quests' ? 'active' : ''}`} type="button" onClick={() => { setCurrentView('home'); setListType('quests'); setTagFilter(null); setSidebarOpen(false); }}>
-          <span className="side-nav-icon">🛡️</span><span>Quests</span>
+        <button className={`side-nav-link ${currentView === 'quests' ? 'active' : ''}`} type="button" onClick={() => { setCurrentView('quests'); setListType('quests'); setTagFilter(null); setSidebarOpen(false); }}>
+          <span className="side-nav-icon">★</span><span>Quests</span>
         </button>
         <button className={`side-nav-link ${currentView === 'calendar' ? 'active' : ''}`} type="button" onClick={() => { setCurrentView('calendar'); setSidebarOpen(false); }}>
           <span className="side-nav-icon">□</span><span>Calendar</span>
@@ -852,13 +857,14 @@ function App() {
             }}
           />
         </section>
-      ) : (
+      ) : currentView === 'home' || currentView === 'quests' ? (
         <section className="workspace" aria-label="Task manager">
-          <div className="list-switcher" role="tablist" aria-label="Choose list type">
-            <button className={listType === 'tasks' ? 'active' : ''} onClick={() => switchList('tasks')} type="button" role="tab" aria-selected={listType === 'tasks'}><span>✓</span><b>To-do list</b><small>Plan your tasks</small></button>
-            <button className={listType === 'reminders' ? 'active' : ''} onClick={() => switchList('reminders')} type="button" role="tab" aria-selected={listType === 'reminders'}><span>◷</span><b>Reminder list</b><small>Never miss a thing</small></button>
-            <button className={listType === 'quests' ? 'active' : ''} onClick={() => switchList('quests')} type="button" role="tab" aria-selected={listType === 'quests'}><span>🛡️</span><b>Quests</b><small>Daily workouts & habits</small></button>
-          </div>
+          {currentView === 'home' && (
+            <div className="list-switcher" role="tablist" aria-label="Choose list type">
+              <button className={listType === 'tasks' ? 'active' : ''} onClick={() => switchList('tasks')} type="button" role="tab" aria-selected={listType === 'tasks'}><span>✓</span><b>To-do list</b><small>Plan your tasks</small></button>
+              <button className={listType === 'reminders' ? 'active' : ''} onClick={() => switchList('reminders')} type="button" role="tab" aria-selected={listType === 'reminders'}><span>◷</span><b>Reminder list</b><small>Never miss a thing</small></button>
+            </div>
+          )}
           <div className="mobile-quick-add">
             <div>
               <p>{listType === 'tasks' ? 'Your to-dos' : listType === 'reminders' ? 'Your reminders' : 'Your quests'}</p>
@@ -869,7 +875,7 @@ function App() {
             </button>
           </div>
           <form className={`add-card home-task-form${homeFormOpen ? ' is-open' : ' is-collapsed'}`} onSubmit={saveTask}>
-            <div className="add-card-heading"><div className="icon-circle">{listType === 'tasks' ? '✓' : listType === 'reminders' ? '◷' : '🛡️'}</div><div><h2>{editingId ? `Edit ${listType === 'tasks' ? 'task' : listType === 'reminders' ? 'reminder' : 'quest'}` : `Add a ${listType === 'tasks' ? 'task' : listType === 'reminders' ? 'reminder' : 'quest'}`}</h2><p>{listType === 'tasks' ? 'What needs your attention?' : listType === 'reminders' ? 'What would you like to remember?' : 'What routine do you want to start?'}</p></div></div>
+            <div className="add-card-heading"><div className="icon-circle">{listType === 'tasks' ? '✓' : listType === 'reminders' ? '◷' : '★'}</div><div><h2>{editingId ? `Edit ${listType === 'tasks' ? 'task' : listType === 'reminders' ? 'reminder' : 'quest'}` : `Add a ${listType === 'tasks' ? 'task' : listType === 'reminders' ? 'reminder' : 'quest'}`}</h2><p>{listType === 'tasks' ? 'What needs your attention?' : listType === 'reminders' ? 'What would you like to remember?' : 'What routine do you want to start?'}</p></div></div>
             <div style={{ position: 'relative' }}>
               <label><span>{listType === 'tasks' ? 'Task title' : listType === 'reminders' ? 'Reminder title' : 'Quest title'}</span>
                 <input ref={taskTitleInputRef} value={title} onChange={handleTitleChange} maxLength="80" required placeholder={listType === 'tasks' ? 'e.g. Send the project update #urgent' : listType === 'reminders' ? 'e.g. Call Mum' : 'e.g. Morning Workout'} autoComplete="off" />
@@ -1133,7 +1139,7 @@ function App() {
             {visibleTasks.length === 0 && <div className="empty-state visible"><div className="empty-icon">{listType === 'tasks' ? '✓' : '◷'}</div><h3>{currentTasks.length ? `No matching ${listType === 'tasks' ? 'tasks' : 'reminders'}` : 'Nothing here yet'}</h3><p>{listType === 'tasks' ? 'Add your first task and give your day a little more room to breathe.' : 'Add a reminder and make space in your mind for what matters.'}</p></div>}
           </section>
         </section>
-      )}
+      ) : null}
     </main>
 
     {bulkSelectMode && selectedTaskIds.size > 0 && (
