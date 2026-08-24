@@ -61,8 +61,12 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
+// Detect if running inside a Capacitor native WebView
+const isCapacitorNative = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+
 function getAnimatedBgDefault() {
-  if (typeof window === 'undefined') return true;
+  if (typeof window === 'undefined') return false;
+  if (isCapacitorNative) return false;
   const isMobile = window.innerWidth < 768;
   const isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const hasLowConcurrency = navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4;
@@ -75,7 +79,7 @@ function App() {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const [session, setSession] = useState(null);
-  const [animatedBackground, setAnimatedBackground] = useState(true);
+  const [animatedBackground, setAnimatedBackground] = useState(getAnimatedBgDefault);
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
@@ -105,7 +109,7 @@ function App() {
       ]);
 
       setSession(sess);
-      setAnimatedBackground(animBg);
+      setAnimatedBackground(isCapacitorNative ? false : animBg);
       setTasks(loadedTasks);
       setProjects(loadedProjects);
       setPriorities(loadedPriorities);

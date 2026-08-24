@@ -24,6 +24,9 @@ export default function LoginPage({ onLogin, onShowPrivacyPolicy }) {
   const [shake, setShake] = useState(false);
   const [success, setSuccess] = useState('');
 
+  // Detect Capacitor native to skip WebGL Ballpit (crashes Android WebView)
+  const isNative = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+
   const triggerShake = () => {
     setShake(true);
     setTimeout(() => setShake(false), 500);
@@ -105,22 +108,30 @@ export default function LoginPage({ onLogin, onShowPrivacyPolicy }) {
 
   return (
     <div className="login-page">
-      {/* Ballpit background for visual consistency */}
-      <Suspense fallback={null}>
-        <div className="ballpit-container" aria-hidden="true">
-          <Ballpit
-            count={typeof window !== 'undefined' && window.innerWidth < 768 ? 15 : 60}
-            colors={[0x6254e7, 0x9e90ff, 0x8ac6ff, 0xf5b267, 0xffb7a4]}
-            radiusCm={1}
-            gravity={0}
-            friction={0.94}
-            wallBounce={0.95}
-            maxVelocity={0.5}
-            cursorForce={6}
-            followCursor={typeof window !== 'undefined' && window.innerWidth >= 768}
-          />
+      {/* Background: use CSS orbs on native, Ballpit on web */}
+      {isNative ? (
+        <div className="css-orbs-background" aria-hidden="true">
+          <div className="orb-1"></div>
+          <div className="orb-2"></div>
+          <div className="orb-3"></div>
         </div>
-      </Suspense>
+      ) : (
+        <Suspense fallback={null}>
+          <div className="ballpit-container" aria-hidden="true">
+            <Ballpit
+              count={typeof window !== 'undefined' && window.innerWidth < 768 ? 15 : 60}
+              colors={[0x6254e7, 0x9e90ff, 0x8ac6ff, 0xf5b267, 0xffb7a4]}
+              radiusCm={1}
+              gravity={0}
+              friction={0.94}
+              wallBounce={0.95}
+              maxVelocity={0.5}
+              cursorForce={6}
+              followCursor={typeof window !== 'undefined' && window.innerWidth >= 768}
+            />
+          </div>
+        </Suspense>
+      )}
 
       {/* Floating decorative orbs */}
       <div className="login-orbs" aria-hidden="true">
