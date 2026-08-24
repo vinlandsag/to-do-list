@@ -146,6 +146,7 @@ export function generateNextTaskOccurrence(task, nextDate) {
   
   if (Array.isArray(newTask.subtasks)) {
     newTask.subtasks.forEach(sub => {
+      sub.id = crypto.randomUUID(); // Assign new ID to avoid duplicates
       sub.completed = false;
     });
   }

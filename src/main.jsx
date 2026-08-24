@@ -481,13 +481,29 @@ function App() {
     const updatedSubtasks = [...task.subtasks];
     updatedSubtasks[subtaskIndex] = { ...updatedSubtasks[subtaskIndex], completed: !updatedSubtasks[subtaskIndex].completed };
     
-    nextTasks[taskIndex] = { ...task, subtasks: updatedSubtasks };
-    persist(nextTasks);
-    
     const allDone = updatedSubtasks.every(s => s.completed);
-    if (allDone && !task.completed) {
-      setTimeout(() => toggleTask(taskId), 400);
+    
+    // If all subtasks are done and the main task is not yet completed, auto-complete it
+    let isCompletingMain = allDone && !task.completed;
+    
+    nextTasks[taskIndex] = { 
+      ...task, 
+      subtasks: updatedSubtasks,
+      completed: isCompletingMain ? true : task.completed,
+      completedAt: isCompletingMain ? new Date().toISOString() : task.completedAt,
+      completedBy: isCompletingMain ? (session?.email || null) : task.completedBy
+    };
+    
+    // Handle recurrence if main task was just completed
+    if (isCompletingMain && task.recurrence && task.recurrence.status !== 'paused' && task.recurrence.status !== 'ended') {
+      const nextDate = getNextOccurrenceDate(task.recurrence, task.remindAt || task.createdAt || new Date());
+      if (nextDate) {
+        const nextOccurrence = generateNextTaskOccurrence(nextTasks[taskIndex], nextDate);
+        nextTasks = [nextOccurrence, ...nextTasks];
+      }
     }
+    
+    persist(nextTasks);
   };
   
   const deleteTask = id => { persist(tasks.filter(task => task.id !== id)); if (editingId === id) resetForm(); };
@@ -618,8 +634,11 @@ function App() {
 
       <nav className="side-nav-links">
         <p className="side-nav-label">Workspace</p>
-        <button className={`side-nav-link ${currentView === 'home' && !tagFilter ? 'active' : ''}`} type="button" onClick={() => { setCurrentView('home'); setTagFilter(null); setSidebarOpen(false); }}>
+        <button className={`side-nav-link ${currentView === 'home' && !tagFilter && listType !== 'quests' ? 'active' : ''}`} type="button" onClick={() => { setCurrentView('home'); setListType('tasks'); setTagFilter(null); setSidebarOpen(false); }}>
           <span className="side-nav-icon">⌂</span><span>Home</span>
+        </button>
+        <button className={`side-nav-link ${currentView === 'home' && listType === 'quests' ? 'active' : ''}`} type="button" onClick={() => { setCurrentView('home'); setListType('quests'); setTagFilter(null); setSidebarOpen(false); }}>
+          <span className="side-nav-icon">🛡️</span><span>Quests</span>
         </button>
         <button className={`side-nav-link ${currentView === 'calendar' ? 'active' : ''}`} type="button" onClick={() => { setCurrentView('calendar'); setSidebarOpen(false); }}>
           <span className="side-nav-icon">□</span><span>Calendar</span>
