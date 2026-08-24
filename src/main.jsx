@@ -1105,4 +1105,41 @@ function App() {
   </>;
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('[Flowlist] Uncaught error:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', alignItems: 'center', justifyContent: 'center', color: 'var(--ink, #333)', background: 'var(--cream, #FDFBF7)', padding: '24px', textAlign: 'center' }}>
+          <div style={{ width: '64px', height: '64px', fontSize: '32px', marginBottom: '20px', borderRadius: '50%', background: 'linear-gradient(135deg, #6254e7 0%, #9e90ff 100%)', display: 'grid', placeItems: 'center', color: '#fff' }}>!</div>
+          <div style={{ fontWeight: 700, fontSize: '18px', letterSpacing: '-0.03em', marginBottom: '8px' }}>Something went wrong</div>
+          <div style={{ fontSize: '13px', color: 'var(--muted, #999)', marginBottom: '20px', maxWidth: '300px', lineHeight: '1.5' }}>
+            Flowlist encountered an error. This sometimes happens on devices with limited graphics support.
+          </div>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
+            style={{ border: 'none', borderRadius: '10px', background: 'linear-gradient(135deg, #6254e7, #9e90ff)', color: '#fff', padding: '11px 24px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Reload App
+          </button>
+          <details style={{ marginTop: '20px', fontSize: '11px', color: 'var(--muted, #999)', maxWidth: '300px', textAlign: 'left' }}>
+            <summary style={{ cursor: 'pointer' }}>Error details</summary>
+            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', marginTop: '8px' }}>{this.state.error?.toString()}</pre>
+          </details>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);

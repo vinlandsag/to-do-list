@@ -15,7 +15,26 @@
     <noscript><link rel="stylesheet" href="/styles.css" /></noscript>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="app-loading-fallback" style="display:flex;flex-direction:column;height:100dvh;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;background:#FDFBF7;color:#333">
+        <div style="width:64px;height:64px;font-size:32px;margin-bottom:20px;border-radius:50%;background:linear-gradient(135deg,#6254e7 0%,#9e90ff 100%);display:grid;place-items:center;color:#fff">✓</div>
+        <div style="font-weight:700;font-size:18px;letter-spacing:-0.03em">Flowlist</div>
+        <div style="font-size:12px;color:#999;margin-top:8px">Loading...</div>
+      </div>
+    </div>
+    <script>
+      // Catch fatal JS errors that occur before React mounts
+      window.addEventListener('error', function(e) {
+        var root = document.getElementById('root');
+        var fallback = document.getElementById('app-loading-fallback');
+        if (fallback && root && root.children.length <= 1) {
+          fallback.innerHTML = '<div style="width:64px;height:64px;font-size:32px;margin-bottom:20px;border-radius:50%;background:linear-gradient(135deg,#6254e7,#9e90ff);display:grid;place-items:center;color:#fff">!</div>'
+            + '<div style="font-weight:700;font-size:18px;letter-spacing:-0.03em;margin-bottom:8px">Something went wrong</div>'
+            + '<div style="font-size:13px;color:#999;margin-bottom:20px;max-width:300px;line-height:1.5">Flowlist couldn\'t start. Try reloading or using a different browser.</div>'
+            + '<button onclick="location.reload()" style="border:none;border-radius:10px;background:linear-gradient(135deg,#6254e7,#9e90ff);color:#fff;padding:11px 24px;font-size:14px;font-weight:700;cursor:pointer">Reload</button>';
+        }
+      });
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

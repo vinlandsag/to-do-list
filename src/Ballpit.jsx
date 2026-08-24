@@ -694,6 +694,7 @@ class Z extends d {
 function createBallpit(e, t = {}) {
   if (!e) return null;
 
+  try {
   const i = new x({
     canvas: e,
     size: 'parent',
@@ -796,6 +797,10 @@ function createBallpit(e, t = {}) {
       i.dispose();
     }
   };
+  } catch (err) {
+    console.warn('[Ballpit] WebGL initialization failed:', err);
+    return null;
+  }
 }
 
 const Ballpit = ({ className = '', followCursor = true, ...props }) => {
