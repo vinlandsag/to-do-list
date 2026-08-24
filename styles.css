@@ -1897,6 +1897,9 @@ input:checked + .slider:before {
   .settings-header { flex-direction: column; align-items: flex-start; gap: 16px; }
   .settings-tabs { width: 100%; overflow-x: auto; padding-bottom: 8px; flex-wrap: nowrap; }
   .settings-tabs::-webkit-scrollbar { display: none; }
+  
+  .advanced-options-grid { grid-template-columns: 1fr; }
+  .advanced-options-grid .span-2 { grid-column: span 1; }
 }
 
 @media (max-width: 420px) {
