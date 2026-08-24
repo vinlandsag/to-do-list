@@ -88,11 +88,8 @@ class NotificationService {
     }
     this._timeouts.clear();
     
-    if (Capacitor.isNativePlatform()) {
-      // We will batch schedule all native notifications
-      this._syncNativeSchedules(tasks, acknowledgedSet);
-      return;
-    }
+    // Fallback to JS timeouts for all platforms to avoid Android 14 SecurityException crashes
+    // with exact alarms on LocalNotifications.
 
     const now = Date.now();
 
@@ -173,19 +170,7 @@ class NotificationService {
     if (delay <= 0) {
       this._fire(task);
     } else {
-      if (Capacitor.isNativePlatform()) {
-        LocalNotifications.schedule({
-          notifications: [{
-            title: `⏰ ${task.title}`,
-            body: task.description || 'Your reminder is due!',
-            id: hashUUIDToInt32(task.id),
-            schedule: { at: new Date(dueTime) },
-            extra: { taskId: task.id }
-          }]
-        });
-      } else {
-        this._schedule(task, delay);
-      }
+      this._schedule(task, delay);
     }
   }
 
@@ -193,9 +178,7 @@ class NotificationService {
    * Cancels a pending reminder.
    */
   cancelReminder(taskId) {
-    if (Capacitor.isNativePlatform()) {
-      LocalNotifications.cancel({ notifications: [{ id: hashUUIDToInt32(taskId) }] });
-    } else if (this._timeouts.has(taskId)) {
+    if (this._timeouts.has(taskId)) {
       clearTimeout(this._timeouts.get(taskId));
       this._timeouts.delete(taskId);
     }
@@ -209,8 +192,7 @@ class NotificationService {
       playChime();
     }
 
-    // 1. Browser OS Notification (Web only, Native is handled by LocalNotifications scheduling)
-    if (!Capacitor.isNativePlatform() && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
       try {
         const n = new Notification(`⏰ ${task.title}`, {
           body: task.description || 'Your reminder is due!',

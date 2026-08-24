@@ -199,6 +199,7 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [subtasks, setSubtasks] = useState([]);
   const [remindAt, setRemindAt] = useState('');
   const [projectId, setProjectId] = useState('');
   const [priority, setPriority] = useState('');
@@ -322,7 +323,7 @@ function App() {
     repository.saveActivities(nextActivities);
   }, []);
 
-  const resetForm = () => { setEditingId(null); setTitle(''); setDescription(''); setRemindAt(''); setProjectId(''); setPriority(''); setTagInput(''); setShowAdvanced(false); setRecurrenceFrequency('none'); setRecurrenceInterval(1); setRecurrenceWeekdays([]); setRecurrenceEndDate(''); };
+  const resetForm = () => { setEditingId(null); setTitle(''); setDescription(''); setSubtasks([]); setRemindAt(''); setProjectId(''); setPriority(''); setTagInput(''); setShowAdvanced(false); setRecurrenceFrequency('none'); setRecurrenceInterval(1); setRecurrenceWeekdays([]); setRecurrenceEndDate(''); };
 
   /* ─── Notification system ─── */
   const { toasts, notifications, unreadCount, overdueTasks, markRead, markAllRead, clearNotifications, dismissToast, snoozeTask, completeTaskFromToast } = useNotifications(tasks, persist, activities, session);
@@ -413,9 +414,11 @@ function App() {
       };
     }
 
+    const finalSubtasks = listType === 'quests' ? subtasks.filter(s => s.title.trim()) : [];
+    
     const nextTasks = editingId
-      ? tasks.map(task => task.id === editingId ? { ...task, title: finalTitle, description: description.trim(), remindAt: finalRemindAt, projectId: projectId || null, priority: finalPriority, tags: extractedTags, recurrence: finalRecurrence } : task)
-      : [{ id: crypto.randomUUID(), type: listType, title: finalTitle, description: description.trim(), remindAt: finalRemindAt, projectId: projectId || null, priority: finalPriority, tags: extractedTags, recurrence: finalRecurrence, createdAt: new Date().toISOString(), completed: false, completedAt: null }, ...tasks];
+      ? tasks.map(task => task.id === editingId ? { ...task, title: finalTitle, description: description.trim(), remindAt: finalRemindAt, projectId: projectId || null, priority: finalPriority, tags: extractedTags, recurrence: finalRecurrence, subtasks: finalSubtasks } : task)
+      : [{ id: crypto.randomUUID(), type: listType, title: finalTitle, description: description.trim(), remindAt: finalRemindAt, projectId: projectId || null, priority: finalPriority, tags: extractedTags, recurrence: finalRecurrence, subtasks: finalSubtasks, createdAt: new Date().toISOString(), completed: false, completedAt: null }, ...tasks];
     persist(nextTasks);
     resetForm();
     setTagAutocomplete({ active: false, query: '' });
@@ -463,6 +466,30 @@ function App() {
 
     persist(nextTasks);
   };
+  
+  const toggleSubtask = (taskId, subtaskId) => {
+    let nextTasks = [...tasks];
+    const taskIndex = nextTasks.findIndex(t => t.id === taskId);
+    if (taskIndex === -1) return;
+    
+    const task = nextTasks[taskIndex];
+    if (!task.subtasks) return;
+    
+    const subtaskIndex = task.subtasks.findIndex(s => s.id === subtaskId);
+    if (subtaskIndex === -1) return;
+    
+    const updatedSubtasks = [...task.subtasks];
+    updatedSubtasks[subtaskIndex] = { ...updatedSubtasks[subtaskIndex], completed: !updatedSubtasks[subtaskIndex].completed };
+    
+    nextTasks[taskIndex] = { ...task, subtasks: updatedSubtasks };
+    persist(nextTasks);
+    
+    const allDone = updatedSubtasks.every(s => s.completed);
+    if (allDone && !task.completed) {
+      setTimeout(() => toggleTask(taskId), 400);
+    }
+  };
+  
   const deleteTask = id => { persist(tasks.filter(task => task.id !== id)); if (editingId === id) resetForm(); };
   const startEditing = task => {
     setHomeFormOpen(true);
@@ -470,6 +497,7 @@ function App() {
     const tagString = (task.tags && task.tags.length > 0) ? ` ${task.tags.map(t => `#${t}`).join(' ')}` : '';
     setTitle(task.title + tagString);
     setDescription(task.description);
+    setSubtasks(task.subtasks || []);
     setRemindAt(task.remindAt || '');
     setProjectId(task.projectId || '');
     setPriority(task.priority || '');
@@ -810,21 +838,22 @@ function App() {
           <div className="list-switcher" role="tablist" aria-label="Choose list type">
             <button className={listType === 'tasks' ? 'active' : ''} onClick={() => switchList('tasks')} type="button" role="tab" aria-selected={listType === 'tasks'}><span>✓</span><b>To-do list</b><small>Plan your tasks</small></button>
             <button className={listType === 'reminders' ? 'active' : ''} onClick={() => switchList('reminders')} type="button" role="tab" aria-selected={listType === 'reminders'}><span>◷</span><b>Reminder list</b><small>Never miss a thing</small></button>
+            <button className={listType === 'quests' ? 'active' : ''} onClick={() => switchList('quests')} type="button" role="tab" aria-selected={listType === 'quests'}><span>🛡️</span><b>Quests</b><small>Daily workouts & habits</small></button>
           </div>
           <div className="mobile-quick-add">
             <div>
-              <p>{listType === 'tasks' ? 'Your to-dos' : 'Your reminders'}</p>
-              <span>{listType === 'tasks' ? 'Keep your day clear and moving.' : 'Set it once, then let Flowlist remember.'}</span>
+              <p>{listType === 'tasks' ? 'Your to-dos' : listType === 'reminders' ? 'Your reminders' : 'Your quests'}</p>
+              <span>{listType === 'tasks' ? 'Keep your day clear and moving.' : listType === 'reminders' ? 'Set it once, then let Flowlist remember.' : 'Level up with routines and repeating goals.'}</span>
             </div>
             <button className="primary-button" type="button" onClick={() => setHomeFormOpen(true)}>
-              {listType === 'tasks' ? 'Add task' : 'Add reminder'} <span>+</span>
+              {listType === 'tasks' ? 'Add task' : listType === 'reminders' ? 'Add reminder' : 'Add quest'} <span>+</span>
             </button>
           </div>
           <form className={`add-card home-task-form${homeFormOpen ? ' is-open' : ' is-collapsed'}`} onSubmit={saveTask}>
-            <div className="add-card-heading"><div className="icon-circle">{listType === 'tasks' ? '+' : '◷'}</div><div><h2>{editingId ? `Edit ${listType === 'tasks' ? 'task' : 'reminder'}` : `Add a ${listType === 'tasks' ? 'task' : 'reminder'}`}</h2><p>{listType === 'tasks' ? 'What needs your attention?' : 'What would you like to remember?'}</p></div></div>
+            <div className="add-card-heading"><div className="icon-circle">{listType === 'tasks' ? '✓' : listType === 'reminders' ? '◷' : '🛡️'}</div><div><h2>{editingId ? `Edit ${listType === 'tasks' ? 'task' : listType === 'reminders' ? 'reminder' : 'quest'}` : `Add a ${listType === 'tasks' ? 'task' : listType === 'reminders' ? 'reminder' : 'quest'}`}</h2><p>{listType === 'tasks' ? 'What needs your attention?' : listType === 'reminders' ? 'What would you like to remember?' : 'What routine do you want to start?'}</p></div></div>
             <div style={{ position: 'relative' }}>
-              <label><span>{listType === 'tasks' ? 'Task title' : 'Reminder title'}</span>
-                <input ref={taskTitleInputRef} value={title} onChange={handleTitleChange} maxLength="80" required placeholder={listType === 'tasks' ? 'e.g. Send the project update #urgent' : 'e.g. Call Mum'} autoComplete="off" />
+              <label><span>{listType === 'tasks' ? 'Task title' : listType === 'reminders' ? 'Reminder title' : 'Quest title'}</span>
+                <input ref={taskTitleInputRef} value={title} onChange={handleTitleChange} maxLength="80" required placeholder={listType === 'tasks' ? 'e.g. Send the project update #urgent' : listType === 'reminders' ? 'e.g. Call Mum' : 'e.g. Morning Workout'} autoComplete="off" />
               </label>
 
               {tagAutocomplete.active && (
@@ -865,7 +894,33 @@ function App() {
                 </div>
               )}
             </div>
-            {listType === 'reminders' && (
+            
+            {listType === 'quests' && (
+              <div style={{ marginBottom: '16px' }}>
+                <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--ink)', marginBottom: '8px' }}>Subquests (Steps)</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {subtasks.map((sub, index) => (
+                    <div key={sub.id} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input type="text" value={sub.title} onChange={e => {
+                        const newSubtasks = [...subtasks];
+                        newSubtasks[index].title = e.target.value;
+                        setSubtasks(newSubtasks);
+                      }} placeholder={`Step ${index + 1}`} style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: '10px', background: 'var(--paper)', outline: 'none' }} required />
+                      <button type="button" onClick={() => {
+                        setSubtasks(subtasks.filter((_, i) => i !== index));
+                      }} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', padding: '4px 8px', fontSize: '18px' }}>×</button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => {
+                    setSubtasks([...subtasks, { id: crypto.randomUUID(), title: '', completed: false }]);
+                  }} style={{ alignSelf: 'flex-start', background: 'none', border: '1px dashed var(--line)', color: 'var(--ink)', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                    + Add Subquest
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(listType === 'reminders' || listType === 'quests') && (
               <>
                 <label>
                   <span>Remind me <i>(optional)</i></span>
@@ -920,7 +975,7 @@ function App() {
                     </div>
                   </div>
                 )}
-                {recurrenceFrequency !== 'none' && (
+            {(listType === 'reminders' || listType === 'quests') && recurrenceFrequency !== 'none' && (
                   <label>
                     <span>Ends on <i>(optional)</i></span>
                     <input type="date" value={recurrenceEndDate} onChange={e => setRecurrenceEndDate(e.target.value)} />
@@ -1033,6 +1088,24 @@ function App() {
                     </p>
                   )}
                   {task.description && <p className="task-description">{task.description}</p>}
+                  {task.subtasks && task.subtasks.length > 0 && (
+                    <div className="task-subtasks">
+                      <div className="subtasks-progress">
+                        <div className="progress-bar-bg" style={{ width: '100%', height: '4px', background: 'var(--line)', borderRadius: '2px', overflow: 'hidden', marginTop: '8px', marginBottom: '8px' }}>
+                          <div className="progress-bar-fill" style={{ width: `${(task.subtasks.filter(s => s.completed).length / task.subtasks.length) * 100}%`, height: '100%', background: 'var(--purple)', transition: 'width 0.3s ease' }} />
+                        </div>
+                        <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600 }}>{task.subtasks.filter(s => s.completed).length} / {task.subtasks.length} steps</span>
+                      </div>
+                      <div className="subtasks-list" style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {task.subtasks.map(sub => (
+                          <label key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', opacity: sub.completed ? 0.6 : 1, textDecoration: sub.completed ? 'line-through' : 'none' }}>
+                            <input type="checkbox" checked={sub.completed} onChange={() => toggleSubtask(task.id, sub.id)} style={{ accentColor: 'var(--purple)', width: '14px', height: '14px' }} />
+                            {sub.title}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <p className="task-meta">{task.completed ? `Completed ${formatDate(task.completedAt)}` : `Created ${formatDate(task.createdAt)}`}</p>
                 </div>
                 <div className="task-actions"><button className="icon-button edit-button" type="button" onClick={() => startEditing(task)} aria-label="Edit task">✎</button><button className="icon-button delete-button" type="button" onClick={() => deleteTask(task.id)} aria-label="Delete task">×</button></div>

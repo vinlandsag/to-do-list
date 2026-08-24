@@ -144,6 +144,12 @@ export function generateNextTaskOccurrence(task, nextDate) {
   newTask.completedAt = null;
   newTask.createdAt = new Date().toISOString();
   
+  if (Array.isArray(newTask.subtasks)) {
+    newTask.subtasks.forEach(sub => {
+      sub.completed = false;
+    });
+  }
+  
   // Update reminder if it exists
   if (newTask.remindAt) {
     const oldRemind = new Date(newTask.remindAt);
